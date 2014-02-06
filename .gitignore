@@ -1,0 +1,9 @@
+/build
+/.coverage
+/cov_html
+/dist
+/heyu.egg-info
+/.tox
+*.egg
+*.log
+*.py[co]
