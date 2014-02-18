@@ -54,6 +54,7 @@ _versions = {
         },
         'subscribe': {},
         'subscribed': {},
+        'goodbye': {},
         'error': {
             'required': set(['reason']),
         },
