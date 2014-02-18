@@ -179,9 +179,12 @@ class Message(object):
 
         return self._msg_type in _versions[self._version]
 
-    def to_frame(self):
+    def to_frame(self, version=_curr_version):
         """
         Construct a binary frame from the message.
+
+        :param version: The protocol version to send.  Currently
+                        ignored.
 
         :returns: The binary frame.
         """
