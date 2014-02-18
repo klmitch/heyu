@@ -38,6 +38,7 @@ setup(
     tests_require=readreq('test-requirements.txt'),
     entry_points={
         'console_scripts': [
+            'heyu-notify = heyu.submitter:send_notification.console',
         ],
     },
 )
