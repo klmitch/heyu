@@ -13,9 +13,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ConfigParser
+import ssl
 import unittest
 
+import mock
+
 from heyu import util
+
+
+class TestException(Exception):
+    pass
 
 
 class ParseHubTest(unittest.TestCase):
@@ -65,3 +73,243 @@ class ParseHubTest(unittest.TestCase):
         result = util.parse_hub('[::1]:1234')
 
         self.assertEqual(('::1', 1234), result)
+
+
+class CertWrapperTest(unittest.TestCase):
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': [],
+        'items.return_value': [],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_insecure(self, mock_TendrilPartial, mock_SafeConfigParser,
+                      mock_expanduser):
+        result = util.cert_wrapper(None, 'test', secure=False)
+
+        self.assertEqual(None, result)
+        self.assertFalse(mock_expanduser.called)
+        self.assertFalse(mock_SafeConfigParser.called)
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': [],
+        'items.return_value': [],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_missing_conf(self, mock_TendrilPartial, mock_SafeConfigParser,
+                          mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper, None, 'test')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        self.assertFalse(cp.items.called)
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': [],
+        'items.return_value': [],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_bad_conf(self, mock_TendrilPartial, mock_SafeConfigParser,
+                      mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper,
+                          'bad[file', 'test')
+        self.assertFalse(mock_expanduser.called)
+        self.assertFalse(mock_SafeConfigParser.called)
+        self.assertFalse(cp.items.called)
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.side_effect': ConfigParser.NoSectionError('test'),
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_missing_profile(self, mock_TendrilPartial, mock_SafeConfigParser,
+                             mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper, None, 'test')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.side_effect': TestException('test'),
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_unloadable_profile(self, mock_TendrilPartial,
+                                mock_SafeConfigParser, mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper, None, 'test')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [('cafile', 'ca'), ('certfile', 'cert')],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_missing_keyfile(self, mock_TendrilPartial, mock_SafeConfigParser,
+                             mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper, None, 'test')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [('keyfile', 'key'), ('certfile', 'cert')],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_missing_cafile(self, mock_TendrilPartial, mock_SafeConfigParser,
+                            mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper, None, 'test')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [('cafile', 'ca'), ('keyfile', 'key')],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_missing_certfile(self, mock_TendrilPartial, mock_SafeConfigParser,
+                              mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        self.assertRaises(util.CertException, util.cert_wrapper, None, 'test')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        self.assertFalse(mock_TendrilPartial.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [
+            ('cafile', 'ca'),
+            ('keyfile', 'key'),
+            ('certfile', 'cert'),
+        ],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_basic(self, mock_TendrilPartial, mock_SafeConfigParser,
+                   mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        result = util.cert_wrapper(None, 'test')
+
+        self.assertEqual(result, 'wrapper')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        mock_TendrilPartial.assert_called_once_with(
+            ssl.wrap_socket, keyfile='key', certfile='cert', ca_certs='ca',
+            server_side=False, cert_reqs=ssl.CERT_REQUIRED,
+            ssl_version=ssl.PROTOCOL_TLSv1)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [
+            ('cafile', 'ca'),
+            ('keyfile', 'key'),
+            ('certfile', 'cert'),
+        ],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_server(self, mock_TendrilPartial, mock_SafeConfigParser,
+                    mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        result = util.cert_wrapper(None, 'test', True)
+
+        self.assertEqual(result, 'wrapper')
+        mock_expanduser.assert_called_once_with('~/.heyu.cert')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        mock_TendrilPartial.assert_called_once_with(
+            ssl.wrap_socket, keyfile='key', certfile='cert', ca_certs='ca',
+            server_side=True, cert_reqs=ssl.CERT_REQUIRED,
+            ssl_version=ssl.PROTOCOL_TLSv1)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [
+            ('cafile', 'ca'),
+            ('keyfile', 'key'),
+            ('certfile', 'cert'),
+        ],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_alt_conf(self, mock_TendrilPartial, mock_SafeConfigParser,
+                      mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        result = util.cert_wrapper('alt_conf', 'test')
+
+        self.assertEqual(result, 'wrapper')
+        mock_expanduser.assert_called_once_with('alt_conf')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('test')
+        mock_TendrilPartial.assert_called_once_with(
+            ssl.wrap_socket, keyfile='key', certfile='cert', ca_certs='ca',
+            server_side=False, cert_reqs=ssl.CERT_REQUIRED,
+            ssl_version=ssl.PROTOCOL_TLSv1)
+
+    @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
+    @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{
+        'read.return_value': ['/home/dir/.heyu.cert'],
+        'items.return_value': [
+            ('cafile', 'ca'),
+            ('keyfile', 'key'),
+            ('certfile', 'cert'),
+        ],
+    }))
+    @mock.patch('tendril.TendrilPartial', return_value='wrapper')
+    def test_alt_profile(self, mock_TendrilPartial, mock_SafeConfigParser,
+                         mock_expanduser):
+        cp = mock_SafeConfigParser.return_value
+
+        result = util.cert_wrapper('alt_conf[alt_profile]', 'test')
+
+        self.assertEqual(result, 'wrapper')
+        mock_expanduser.assert_called_once_with('alt_conf')
+        mock_SafeConfigParser.assert_called_once_with()
+        cp.read.assert_called_once_with('/home/dir/.heyu.cert')
+        cp.items.assert_called_once_with('alt_profile')
+        mock_TendrilPartial.assert_called_once_with(
+            ssl.wrap_socket, keyfile='key', certfile='cert', ca_certs='ca',
+            server_side=False, cert_reqs=ssl.CERT_REQUIRED,
+            ssl_version=ssl.PROTOCOL_TLSv1)
