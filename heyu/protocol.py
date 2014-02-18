@@ -16,6 +16,18 @@
 import msgpack
 
 
+# The urgency levels
+URGENCY_LOW = 0
+URGENCY_NORMAL = 1
+URGENCY_CRITICAL = 2
+
+# A name to level map
+urgency_map = {
+    'low': URGENCY_LOW,
+    'normal': URGENCY_NORMAL,
+    'critical': URGENCY_CRITICAL,
+}
+
 # The current protocol version.  An entry for this must exist in the
 # _versions dictionary.
 _curr_version = 0
@@ -29,6 +41,22 @@ _curr_version = 0
 # assumed for them.
 _versions = {
     0: {
+        'notify': {
+            'required': set(['app_name', 'summary', 'body']),
+            'defaults': {
+                'urgency': URGENCY_LOW,
+                'category': None,
+                'id': None,
+            },
+        },
+        'accepted': {
+            'required': set(['id']),
+        },
+        'subscribe': {},
+        'subscribed': {},
+        'error': {
+            'required': set(['reason']),
+        },
     },
 }
 
