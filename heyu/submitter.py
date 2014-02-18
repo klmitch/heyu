@@ -34,6 +34,13 @@ class SubmitterException(Exception):
 
 
 class SubmitterApplication(tendril.Application):
+    """
+    The application for the submitter, a HeyU client.  The submitter
+    is used for submitting a notification to the HeyU hub; it sends a
+    "notify" message, and expects either an "accepted" message or an
+    "error" message in response.
+    """
+
     def __init__(self, parent, app_name, summary, body,
                  urgency=None, category=None, id=None):
         """
