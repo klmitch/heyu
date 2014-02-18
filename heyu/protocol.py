@@ -95,8 +95,9 @@ class Message(object):
         except KeyError as e:
             raise ValueError("missing required PDU field %s" % str(e))
 
-        # Construct a message
-        return cls(msg_type, __version__=version, **dict(
+        # Construct a message; we pass the frame in to prime the frame
+        # cache
+        return cls(msg_type, __version__=version, __frame__=frame, **dict(
             (k, v) for k, v in data.items()
             if k not in ('__version__', 'msg_type')))
 
@@ -109,25 +110,26 @@ class Message(object):
         :param msg_type: The type of the message.  A string.
         """
 
-        # Extract the desired protocol specification
-        _version = args.pop('__version__', _curr_version)
+        # Extract the message protocol version and bare frame
+        version = args.pop('__version__', _curr_version)
+        frame = args.pop('__frame__', None)
 
         # Make sure we know that version
-        if _version not in _versions:
-            raise ValueError("cannot handle PDUs of version %d" % _version)
+        if version not in _versions:
+            raise ValueError("cannot handle PDUs of version %d" % version)
 
         # Save the basic data about the message
-        self._version = _version
+        self._version = version
         self._msg_type = msg_type
 
         # Make sure we have all required arguments for the message
         # type and cache the defaults
         self._defaults = {}
-        if msg_type in _versions[_version]:
+        if msg_type in _versions[version]:
             # Cache the defaults
-            self._defaults = _versions[_version][msg_type].get('defaults', {})
+            self._defaults = _versions[version][msg_type].get('defaults', {})
 
-            for key in _versions[_version][msg_type].get('required', set()):
+            for key in _versions[version][msg_type].get('required', set()):
                 if key not in args:
                     raise ValueError("missing required PDU field '%s' for "
                                      "'%s' messages" % (key, msg_type))
@@ -135,6 +137,11 @@ class Message(object):
         # Save the arguments
         self._args = dict((k, v) for k, v in args.items()
                           if k not in self._defaults or v != self._defaults[k])
+
+        # Set up the frame cache
+        self._frame_cache = {}
+        if frame is not None:
+            self._frame_cache[version] = frame
 
     def __getattr__(self, name):
         """
@@ -183,16 +190,22 @@ class Message(object):
         """
         Construct a binary frame from the message.
 
-        :param version: The protocol version to send.  Currently
-                        ignored.
+        :param version: The protocol version to send.
 
         :returns: The binary frame.
         """
 
-        # Build the frame data
-        data = self._args.copy()
-        data['msg_type'] = self._msg_type
-        data['__version__'] = self._version
+        if version not in self._frame_cache:
+            # Can only handle _curr_version
+            if version != _curr_version:
+                raise ValueError('cannot serialize into version %s' % version)
 
-        # Return the actual binary data
-        return msgpack.dumps(data)
+            # Build the frame data
+            data = self._args.copy()
+            data['msg_type'] = self._msg_type
+            data['__version__'] = self._version
+
+            # Return the actual binary data
+            self._frame_cache[version] = msgpack.dumps(data)
+
+        return self._frame_cache[version]

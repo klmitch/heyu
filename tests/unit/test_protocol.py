@@ -60,7 +60,7 @@ class MessageTest(unittest.TestCase):
         self.assertTrue(isinstance(msg, protocol.Message))
         mock_loads.assert_called_once_with('frame')
         mock_init.assert_called_once_with(
-            'test', __version__=5, a=1, b=2, c=3)
+            'test', __version__=5, __frame__='frame', a=1, b=2, c=3)
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {}},
@@ -84,6 +84,19 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(msg._msg_type, 'test')
         self.assertEqual(msg._defaults, {})
         self.assertEqual(msg._args, {'a': 1, 'b': 2, 'c': 3})
+        self.assertEqual(msg._frame_cache, {})
+
+    @mock.patch.dict(protocol._versions, {
+        0: {'test': {}},
+    })
+    def test_init_primed(self):
+        msg = protocol.Message('test', a=1, b=2, c=3, __frame__='frame')
+
+        self.assertEqual(msg._version, protocol._curr_version)
+        self.assertEqual(msg._msg_type, 'test')
+        self.assertEqual(msg._defaults, {})
+        self.assertEqual(msg._args, {'a': 1, 'b': 2, 'c': 3})
+        self.assertEqual(msg._frame_cache, {protocol._curr_version: 'frame'})
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {'defaults': {'def': 'ault'}}},
@@ -95,6 +108,7 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(msg._msg_type, 'test')
         self.assertEqual(msg._defaults, {'def': 'ault'})
         self.assertEqual(msg._args, {'a': 1, 'b': 2, 'c': 3})
+        self.assertEqual(msg._frame_cache, {})
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {'defaults': {'b': 2, 'c': 4, 'd': 5}}},
@@ -106,6 +120,7 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(msg._msg_type, 'test')
         self.assertEqual(msg._defaults, {'b': 2, 'c': 4, 'd': 5})
         self.assertEqual(msg._args, {'a': 1, 'c': 3})
+        self.assertEqual(msg._frame_cache, {})
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {}},
@@ -118,6 +133,7 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(msg._msg_type, 'test1')
         self.assertEqual(msg._defaults, {})
         self.assertEqual(msg._args, {'a': 1, 'b': 2, 'c': 3})
+        self.assertEqual(msg._frame_cache, {})
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {}},
@@ -129,6 +145,7 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(msg._msg_type, 'other')
         self.assertEqual(msg._defaults, {})
         self.assertEqual(msg._args, {'a': 1, 'b': 2, 'c': 3})
+        self.assertEqual(msg._frame_cache, {})
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {'required': set(['spam'])}},
@@ -141,6 +158,7 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(msg._defaults, {})
         self.assertEqual(msg._args, {'a': 1, 'b': 2, 'c': 3,
                                      'spam': 'spam'})
+        self.assertEqual(msg._frame_cache, {})
 
     @mock.patch.dict(protocol._versions, {
         0: {'test': {}},
@@ -210,7 +228,7 @@ class MessageTest(unittest.TestCase):
         0: {'test': {}},
     })
     @mock.patch('msgpack.dumps', return_value='frame')
-    def test_to_frame(self, mock_dumps):
+    def test_to_frame_uncached(self, mock_dumps):
         msg = protocol.Message('test', a=1, b=2, c=3)
 
         result = msg.to_frame()
@@ -223,3 +241,25 @@ class MessageTest(unittest.TestCase):
             'b': 2,
             'c': 3,
         })
+
+    @mock.patch.dict(protocol._versions, {
+        0: {'test': {}},
+    })
+    @mock.patch('msgpack.dumps', return_value='frame')
+    def test_to_frame_cached(self, mock_dumps):
+        msg = protocol.Message('test', a=1, b=2, c=3, __frame__='cached')
+
+        result = msg.to_frame()
+
+        self.assertEqual(result, 'cached')
+        self.assertFalse(mock_dumps.called)
+
+    @mock.patch.dict(protocol._versions, {
+        0: {'test': {}},
+    })
+    @mock.patch('msgpack.dumps', return_value='frame')
+    def test_to_frame_bad_version(self, mock_dumps):
+        msg = protocol.Message('test', a=1, b=2, c=3)
+
+        self.assertRaises(ValueError, msg.to_frame, -1)
+        self.assertFalse(mock_dumps.called)
