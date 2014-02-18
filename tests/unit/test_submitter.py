@@ -135,34 +135,43 @@ class SubmitterApplicationTest(unittest.TestCase):
 
 
 class SendNotificationTest(unittest.TestCase):
+    @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     @mock.patch('tendril.get_manager')
     @mock.patch('tendril.TendrilPartial', return_value='the_app')
-    def test_basic(self, mock_TendrilPartial, mock_get_manager):
+    def test_basic(self, mock_TendrilPartial, mock_get_manager,
+                   mock_cert_wrapper):
         submitter.send_notification('hub', 'app', 'summary', 'body')
 
         mock_get_manager.assert_called_once_with('tcp')
         mock_get_manager.return_value.assert_has_calls([
             mock.call.start(),
-            mock.call.connect('hub', 'the_app'),
+            mock.call.connect('hub', 'the_app', 'wrapper'),
         ])
         mock_TendrilPartial.assert_called_once_with(
             submitter.SubmitterApplication,
             'app', 'summary', 'body', None, None, None)
+        mock_cert_wrapper.assert_called_once_with(
+            None, 'submitter', secure=True)
 
+    @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     @mock.patch('tendril.get_manager')
     @mock.patch('tendril.TendrilPartial', return_value='the_app')
-    def test_extra(self, mock_TendrilPartial, mock_get_manager):
+    def test_extra(self, mock_TendrilPartial, mock_get_manager,
+                   mock_cert_wrapper):
         submitter.send_notification('hub', 'app', 'summary', 'body',
-                                    'urgency', 'category', 'id')
+                                    'urgency', 'category', 'id',
+                                    'cert_conf', False)
 
         mock_get_manager.assert_called_once_with('tcp')
         mock_get_manager.return_value.assert_has_calls([
             mock.call.start(),
-            mock.call.connect('hub', 'the_app'),
+            mock.call.connect('hub', 'the_app', 'wrapper'),
         ])
         mock_TendrilPartial.assert_called_once_with(
             submitter.SubmitterApplication,
             'app', 'summary', 'body', 'urgency', 'category', 'id')
+        mock_cert_wrapper.assert_called_once_with(
+            'cert_conf', 'submitter', secure=False)
 
 
 class NormalizeArgsTest(unittest.TestCase):

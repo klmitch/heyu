@@ -124,14 +124,27 @@ class SubmitterApplication(tendril.Application):
 @cli_tools.argument('--id', '-I',
                     default=None,
                     help='Specifies the ID of a notification to replace.')
+@cli_tools.argument('--cert-conf', '-C',
+                    default=None,
+                    help='Specifies an alternate path to the certificate '
+                    'configuration file.')
+@cli_tools.argument('--insecure', '-k',
+                    dest='secure',
+                    default=True,
+                    action='store_false',
+                    help='Specifies that SSL should not be used to connect '
+                    'to the hub.')
 def send_notification(hub, app_name, summary, body,
-                      urgency=None, category=None, id=None):
+                      urgency=None, category=None, id=None,
+                      cert_conf=None, secure=True):
     """
     Sends a notification via the configured HeyU hub.  The hub address
     is read from the "~/.heyu.hub" file, which should contain either
     "hostname" or "hostname:port".  If the file doesn't exist, and
     "--host" is not given, "localhost" will be tried.  Prints out the
-    notification ID if the notification is accepted.
+    notification ID if the notification is accepted.  Note that
+    certificate configuration is specified in "~/.heyu.cert" by
+    default.
 
     :param hub: The address of the hub, as a tuple of hostname and
                 port.
@@ -142,6 +155,10 @@ def send_notification(hub, app_name, summary, body,
     :param urgency: The urgency level for the notification.  Optional.
     :param category: A category for the notification.  Optional.
     :param id: The ID of a notification to replace.  Optional.
+    :param cert_conf: The path to the certificate configuration file.
+                      Optional.
+    :param secure: If ``False``, SSL will not be used.  Defaults to
+                   ``True``.
     """
 
     # Look up the manager
@@ -152,7 +169,8 @@ def send_notification(hub, app_name, summary, body,
     app = tendril.TendrilPartial(SubmitterApplication,
                                  app_name, summary, body,
                                  urgency, category, id)
-    manager.connect(hub, app)
+    wrapper = util.cert_wrapper(cert_conf, 'submitter', secure=secure)
+    manager.connect(hub, app, wrapper)
 
 
 @send_notification.processor
