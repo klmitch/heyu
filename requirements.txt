@@ -1,3 +1,4 @@
 cli_tools
+gevent
 msgpack_python
 tendril

@@ -13,10 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import signal
 import socket
 import uuid
 
 import cli_tools
+import gevent
 import tendril
 
 from heyu import protocol
@@ -42,11 +44,24 @@ class HubServer(object):
         # A dictionary to keep track of the listeners
         self._listeners = {}
 
+        # Keep track of whether we're running
+        self._running = False
+
         # Set up the tendril managers
         if not endpoints:
             endpoints = (('', 0),)
         for endpoint in endpoints:
             self._listeners[endpoint] = tendril.get_manager('tcp', endpoint)
+
+        # Set up behavior on signals
+        gevent.signal(signal.SIGINT, self.stop)
+        gevent.signal(signal.SIGTERM, self.stop)
+        try:
+            # Force an immediate shutdown
+            gevent.signal(signal.SIGUSR1, self.shutdown)
+        except Exception:
+            # Ignore errors; SIGUSR1 isn't everywhere
+            pass
 
     def _acceptor(self, tend):
         """
@@ -72,6 +87,10 @@ class HubServer(object):
                        to ``True``.
         """
 
+        # Don't allow redundant start
+        if self._running:
+            raise ValueError('server is already running')
+
         # Get the wrapper
         wrapper = util.cert_wrapper(cert_conf, 'hub', secure=secure)
 
@@ -79,11 +98,18 @@ class HubServer(object):
         for manager in self._listeners.values():
             manager.start(self._acceptor, wrapper)
 
-    def stop(self):
+        self._running = True
+
+    def stop(self, *args):
         """
         Stop the server.  This stops the listening threads and disconnects
-        all the clients.
+        all the clients.  Extra arguments are ignored, so that this
+        method may be used as a signal handler.
         """
+
+        # Do nothing if we're not running
+        if not self._running:
+            return
 
         # Walk through all managers and stop them
         for manager in self._listeners.values():
@@ -93,12 +119,19 @@ class HubServer(object):
         for client, _version in self._subscribers.values():
             client.disconnect()
 
-    def shutdown(self):
+        self._running = False
+
+    def shutdown(self, *args):
         """
         Shut the server down.  This is a nasty version of ``stop()``, in
         that all connections are simply dropped rather than nicely
-        shut down.
+        shut down.  Extra arguments are ignored, so that this method
+        may be used as a signal handler.
         """
+
+        # Do nothing if we're not running
+        if not self._running:
+            return
 
         # Walk through all managers and shut them down
         for manager in self._listeners.values():
@@ -107,6 +140,8 @@ class HubServer(object):
         # All subscriber connections were closed by shutdown, so clear
         # the the sibscribers list
         self._subscribers = {}
+
+        self._running = False
 
     def subscribe(self, client, version):
         """
