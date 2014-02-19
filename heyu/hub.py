@@ -32,10 +32,12 @@ class HubServer(object):
     on to them.
     """
 
-    def __init__(self, *endpoints):
+    def __init__(self, endpoints):
         """
-        Initialize a ``Server`` object.  Each positional argument is taken
-        to be a tuple of address and port to listen on.
+        Initialize a ``Server`` object.
+
+        :param endpoints: A list of tuples of addresses and ports to
+                          listen on.
         """
 
         # A dictionary to keep track of the subscribers
