@@ -30,12 +30,82 @@ class HubServer(object):
     on to them.
     """
 
-    def __init__(self):
+    def __init__(self, *endpoints):
         """
-        Initialize a ``Server`` object.
+        Initialize a ``Server`` object.  Each positional argument is taken
+        to be a tuple of address and port to listen on.
         """
 
         # A dictionary to keep track of the subscribers
+        self._subscribers = {}
+
+        # A dictionary to keep track of the listeners
+        self._listeners = {}
+
+        # Set up the tendril managers
+        if not endpoints:
+            endpoints = (('', 0),)
+        for endpoint in endpoints:
+            self._listeners[endpoint] = tendril.get_manager('tcp', endpoint)
+
+    def _acceptor(self, tend):
+        """
+        Called when a connection is accepted.  Acceptable for use as an
+        acceptor.
+
+        :param tend: The ``tendril.Tendril`` object representing the
+                     connection.
+
+        :returns: An instance of ``HubApplication``.
+        """
+
+        return HubApplication(tend, self)
+
+    def start(self, cert_conf=None, secure=True):
+        """
+        Start the server.  This ensures that the hub can receive
+        connections on the declared endpoints.
+
+        :param cert_conf: The path to the certificate configuration
+                          file.  Optional.
+        :param secure: If ``False``, SSL will not be used.  Defaults
+                       to ``True``.
+        """
+
+        # Get the wrapper
+        wrapper = util.cert_wrapper(cert_conf, 'hub', secure=secure)
+
+        # Walk through all managers and start them
+        for manager in self._listeners.values():
+            manager.start(self._acceptor, wrapper)
+
+    def stop(self):
+        """
+        Stop the server.  This stops the listening threads and disconnects
+        all the clients.
+        """
+
+        # Walk through all managers and stop them
+        for manager in self._listeners.values():
+            manager.stop()
+
+        # Now walk through all the subscribers and disconnect them
+        for client, _version in self._subscribers.values():
+            client.disconnect()
+
+    def shutdown(self):
+        """
+        Shut the server down.  This is a nasty version of ``stop()``, in
+        that all connections are simply dropped rather than nicely
+        shut down.
+        """
+
+        # Walk through all managers and shut them down
+        for manager in self._listeners.values():
+            manager.shutdown()
+
+        # All subscriber connections were closed by shutdown, so clear
+        # the the sibscribers list
         self._subscribers = {}
 
     def subscribe(self, client, version):
