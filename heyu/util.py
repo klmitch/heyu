@@ -79,6 +79,31 @@ def parse_hub(hub):
     return result[0][4]
 
 
+def outgoing_endpoint(target):
+    """
+    The ``tendril.get_manager()`` function must be called with the
+    appropriate originating endpoint for the target address
+    family--that is, if the hub is on an IPv4 address,
+    ``tendril.get_manager()`` must be called with an endpoint of
+    ``('', 0)``, and if it is an IPv6 address, the endpoint must be
+    ``('::', 0)``.  This helper function selects the correct
+    originating endpoint given the target address.
+
+    :param target: The target of the connection.
+
+    :returns: One of ``('', 0)`` or ``('::', 0)``, depending on the
+              address family of ``target``.
+    """
+
+    # Need the address family of the target
+    fam = tendril.addr_info(target)
+
+    # Select the correct endpoint
+    if fam == socket.AF_INET6:
+        return ('::', 0)
+    return ('', 0)
+
+
 # Regular expression for parsing a certificate configuration
 # specification
 CERTCONF_RE = re.compile(r'^(?P<conf_path>[^\[\]]+)'

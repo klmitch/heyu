@@ -169,7 +169,7 @@ def send_notification(hub, app_name, summary, body,
     """
 
     # Look up the manager
-    manager = tendril.get_manager('tcp')
+    manager = tendril.get_manager('tcp', util.outgoing_endpoint(hub))
     manager.start()
 
     # Connect to the hub

@@ -120,6 +120,22 @@ class ParseHubTest(unittest.TestCase):
             '::1', 1234, 0, socket.SOCK_STREAM)
 
 
+class OutgoingEndpointTest(unittest.TestCase):
+    @mock.patch('tendril.addr_info', return_value=socket.AF_INET)
+    def test_ipv4(self, mock_addr_info):
+        result = util.outgoing_endpoint('target')
+
+        self.assertEqual(('', 0), result)
+        mock_addr_info.assert_called_once_with('target')
+
+    @mock.patch('tendril.addr_info', return_value=socket.AF_INET6)
+    def test_ipv6(self, mock_addr_info):
+        result = util.outgoing_endpoint('target')
+
+        self.assertEqual(('::', 0), result)
+        mock_addr_info.assert_called_once_with('target')
+
+
 class CertWrapperTest(unittest.TestCase):
     @mock.patch('os.path.expanduser', return_value='/home/dir/.heyu.cert')
     @mock.patch('ConfigParser.SafeConfigParser', return_value=mock.Mock(**{

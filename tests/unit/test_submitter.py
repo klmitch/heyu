@@ -135,14 +135,16 @@ class SubmitterApplicationTest(unittest.TestCase):
 
 
 class SendNotificationTest(unittest.TestCase):
+    @mock.patch.object(util, 'outgoing_endpoint', return_value='outgoing')
     @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     @mock.patch('tendril.get_manager')
     @mock.patch('tendril.TendrilPartial', return_value='the_app')
     def test_basic(self, mock_TendrilPartial, mock_get_manager,
-                   mock_cert_wrapper):
+                   mock_cert_wrapper, mock_outgoing_endpoint):
         submitter.send_notification('hub', 'app', 'summary', 'body')
 
-        mock_get_manager.assert_called_once_with('tcp')
+        mock_outgoing_endpoint.assert_called_once_with('hub')
+        mock_get_manager.assert_called_once_with('tcp', 'outgoing')
         mock_get_manager.return_value.assert_has_calls([
             mock.call.start(),
             mock.call.connect('hub', 'the_app', 'wrapper'),
@@ -153,16 +155,18 @@ class SendNotificationTest(unittest.TestCase):
         mock_cert_wrapper.assert_called_once_with(
             None, 'submitter', secure=True)
 
+    @mock.patch.object(util, 'outgoing_endpoint', return_value='outgoing')
     @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     @mock.patch('tendril.get_manager')
     @mock.patch('tendril.TendrilPartial', return_value='the_app')
     def test_extra(self, mock_TendrilPartial, mock_get_manager,
-                   mock_cert_wrapper):
+                   mock_cert_wrapper, mock_outgoing_endpoint):
         submitter.send_notification('hub', 'app', 'summary', 'body',
                                     'urgency', 'category', 'id',
                                     'cert_conf', False)
 
-        mock_get_manager.assert_called_once_with('tcp')
+        mock_outgoing_endpoint.assert_called_once_with('hub')
+        mock_get_manager.assert_called_once_with('tcp', 'outgoing')
         mock_get_manager.return_value.assert_has_calls([
             mock.call.start(),
             mock.call.connect('hub', 'the_app', 'wrapper'),
