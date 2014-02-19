@@ -16,6 +16,7 @@
 import ConfigParser
 import os
 import re
+import socket
 import ssl
 
 import tendril
@@ -68,7 +69,14 @@ def parse_hub(hub):
     else:
         port = int(port)
 
-    return (hostname, port)
+    # We have hostname and port, now let's resolve it
+    try:
+        result = socket.getaddrinfo(hostname, port, 0, socket.SOCK_STREAM)
+    except Exception as e:
+        raise HubException("Could not resolve hub hostname '%s': %s" %
+                           (hostname, e))
+
+    return result[0][4]
 
 
 # Regular expression for parsing a certificate configuration
