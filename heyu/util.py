@@ -13,11 +13,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from __future__ import print_function
+
 import ConfigParser
 import os
 import re
 import socket
 import ssl
+import sys
 
 import tendril
 
@@ -197,3 +200,45 @@ def cert_wrapper(cert_conf, profile, server_side=False, secure=True):
         ca_certs=conf['cafile'],
         server_side=server_side, cert_reqs=ssl.CERT_REQUIRED,
         ssl_version=ssl.PROTOCOL_TLSv1)
+
+
+def daemonize(workdir='/', pidfile=None):
+    """
+    Turns the process into a daemon.  Standard input, output, and
+    error are redirected to /dev/null, the current directory is
+    switched, and the standard task of double-forking is performed.
+
+    :param workdir: The directory to switch to.  This should usually
+                    be the root directory.
+    :param pidfile: If provided, the name of a file to write the
+                    process ID into.
+    """
+
+    # Begin by setting up for the daemonizing
+    os.chdir(workdir)
+    os.umask(0)
+
+    # Do the first fork
+    if os.fork() > 0:
+        os._exit()
+
+    # Make ourself a session leader
+    os.setsid()
+
+    # Do the second fork
+    if os.fork() > 0:
+        os._exit()
+
+    # Redirect standard input, standard output, and standard error
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, sys.stdin.fileno())
+    os.dup2(devnull, sys.stdout.fileno())
+    os.dup2(devnull, sys.stderr.fileno())
+    if devnull not in (sys.stdin.fileno(), sys.stdout.fileno(),
+                       sys.stderr.fileno()):
+        os.close(devnull)
+
+    # Create the PID file
+    if pidfile:
+        with open(pidfile, 'w') as f:
+            print(str(os.getpid()), file=f)

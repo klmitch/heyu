@@ -14,6 +14,8 @@
 #    under the License.
 
 import ConfigParser
+import io
+import os
 import socket
 import ssl
 import unittest
@@ -374,3 +376,181 @@ class CertWrapperTest(unittest.TestCase):
             ssl.wrap_socket, keyfile='key', certfile='cert', ca_certs='ca',
             server_side=False, cert_reqs=ssl.CERT_REQUIRED,
             ssl_version=ssl.PROTOCOL_TLSv1)
+
+
+class MyBytesIO(io.BytesIO):
+    """
+    Override close() to preserve the emitted contents.
+    """
+
+    def close(self):
+        self.contents = self.getvalue()
+        super(MyBytesIO, self).close()
+
+
+class DaemonizeTest(unittest.TestCase):
+    @mock.patch('os.chdir')
+    @mock.patch('os.umask')
+    @mock.patch('os.fork', return_value=0)
+    @mock.patch('os._exit')
+    @mock.patch('os.setsid')
+    @mock.patch('os.open', return_value=3)
+    @mock.patch('os.dup2')
+    @mock.patch('os.close')
+    @mock.patch('os.getpid', return_value=1234)
+    @mock.patch('__builtin__.open', return_value=MyBytesIO())
+    @mock.patch('sys.stdin', mock.Mock(**{'fileno.return_value': 0}))
+    @mock.patch('sys.stdout', mock.Mock(**{'fileno.return_value': 1}))
+    @mock.patch('sys.stderr', mock.Mock(**{'fileno.return_value': 2}))
+    def test_child_basic(self, mock_open, mock_getpid, mock_close, mock_dup2,
+                         mock_os_open, mock_setsid, mock_exit, mock_fork,
+                         mock_umask, mock_chdir):
+        util.daemonize()
+
+        mock_chdir.assert_called_once_with('/')
+        mock_umask.assert_called_once_with(0)
+        mock_fork.assert_has_calls([mock.call(), mock.call()])
+        self.assertFalse(mock_exit.called)
+        mock_setsid.assert_called_once_with()
+        mock_os_open.assert_called_once_with(os.devnull, os.O_RDWR)
+        mock_dup2.assert_has_calls([
+            mock.call(3, 0),
+            mock.call(3, 1),
+            mock.call(3, 2),
+        ])
+        mock_close.assert_called_once_with(3)
+        self.assertFalse(mock_getpid.called)
+        self.assertFalse(mock_open.called)
+
+    @mock.patch('os.chdir')
+    @mock.patch('os.umask')
+    @mock.patch('os.fork', return_value=1234)
+    @mock.patch('os._exit')
+    @mock.patch('os.setsid')
+    @mock.patch('os.open', return_value=3)
+    @mock.patch('os.dup2')
+    @mock.patch('os.close')
+    @mock.patch('os.getpid', return_value=1234)
+    @mock.patch('__builtin__.open', return_value=MyBytesIO())
+    @mock.patch('sys.stdin', mock.Mock(**{'fileno.return_value': 0}))
+    @mock.patch('sys.stdout', mock.Mock(**{'fileno.return_value': 1}))
+    @mock.patch('sys.stderr', mock.Mock(**{'fileno.return_value': 2}))
+    def test_parent_basic(self, mock_open, mock_getpid, mock_close, mock_dup2,
+                          mock_os_open, mock_setsid, mock_exit, mock_fork,
+                          mock_umask, mock_chdir):
+        util.daemonize()
+
+        mock_chdir.assert_called_once_with('/')
+        mock_umask.assert_called_once_with(0)
+        mock_fork.assert_has_calls([mock.call(), mock.call()])
+        mock_exit.assert_has_calls([mock.call(), mock.call()])
+        mock_setsid.assert_called_once_with()
+        mock_os_open.assert_called_once_with(os.devnull, os.O_RDWR)
+        mock_dup2.assert_has_calls([
+            mock.call(3, 0),
+            mock.call(3, 1),
+            mock.call(3, 2),
+        ])
+        mock_close.assert_called_once_with(3)
+        self.assertFalse(mock_getpid.called)
+        self.assertFalse(mock_open.called)
+
+    @mock.patch('os.chdir')
+    @mock.patch('os.umask')
+    @mock.patch('os.fork', return_value=0)
+    @mock.patch('os._exit')
+    @mock.patch('os.setsid')
+    @mock.patch('os.open', return_value=0)
+    @mock.patch('os.dup2')
+    @mock.patch('os.close')
+    @mock.patch('os.getpid', return_value=1234)
+    @mock.patch('__builtin__.open', return_value=MyBytesIO())
+    @mock.patch('sys.stdin', mock.Mock(**{'fileno.return_value': 0}))
+    @mock.patch('sys.stdout', mock.Mock(**{'fileno.return_value': 1}))
+    @mock.patch('sys.stderr', mock.Mock(**{'fileno.return_value': 2}))
+    def test_devnull0(self, mock_open, mock_getpid, mock_close, mock_dup2,
+                      mock_os_open, mock_setsid, mock_exit, mock_fork,
+                      mock_umask, mock_chdir):
+        util.daemonize()
+
+        mock_chdir.assert_called_once_with('/')
+        mock_umask.assert_called_once_with(0)
+        mock_fork.assert_has_calls([mock.call(), mock.call()])
+        self.assertFalse(mock_exit.called)
+        mock_setsid.assert_called_once_with()
+        mock_os_open.assert_called_once_with(os.devnull, os.O_RDWR)
+        mock_dup2.assert_has_calls([
+            mock.call(0, 0),
+            mock.call(0, 1),
+            mock.call(0, 2),
+        ])
+        self.assertFalse(mock_close.called)
+        self.assertFalse(mock_getpid.called)
+        self.assertFalse(mock_open.called)
+
+    @mock.patch('os.chdir')
+    @mock.patch('os.umask')
+    @mock.patch('os.fork', return_value=0)
+    @mock.patch('os._exit')
+    @mock.patch('os.setsid')
+    @mock.patch('os.open', return_value=3)
+    @mock.patch('os.dup2')
+    @mock.patch('os.close')
+    @mock.patch('os.getpid', return_value=1234)
+    @mock.patch('__builtin__.open', return_value=MyBytesIO())
+    @mock.patch('sys.stdin', mock.Mock(**{'fileno.return_value': 0}))
+    @mock.patch('sys.stdout', mock.Mock(**{'fileno.return_value': 1}))
+    @mock.patch('sys.stderr', mock.Mock(**{'fileno.return_value': 2}))
+    def test_alt_workdir(self, mock_open, mock_getpid, mock_close, mock_dup2,
+                         mock_os_open, mock_setsid, mock_exit, mock_fork,
+                         mock_umask, mock_chdir):
+        util.daemonize(workdir='/work/dir')
+
+        mock_chdir.assert_called_once_with('/work/dir')
+        mock_umask.assert_called_once_with(0)
+        mock_fork.assert_has_calls([mock.call(), mock.call()])
+        self.assertFalse(mock_exit.called)
+        mock_setsid.assert_called_once_with()
+        mock_os_open.assert_called_once_with(os.devnull, os.O_RDWR)
+        mock_dup2.assert_has_calls([
+            mock.call(3, 0),
+            mock.call(3, 1),
+            mock.call(3, 2),
+        ])
+        mock_close.assert_called_once_with(3)
+        self.assertFalse(mock_getpid.called)
+        self.assertFalse(mock_open.called)
+
+    @mock.patch('os.chdir')
+    @mock.patch('os.umask')
+    @mock.patch('os.fork', return_value=0)
+    @mock.patch('os._exit')
+    @mock.patch('os.setsid')
+    @mock.patch('os.open', return_value=3)
+    @mock.patch('os.dup2')
+    @mock.patch('os.close')
+    @mock.patch('os.getpid', return_value=1234)
+    @mock.patch('__builtin__.open', return_value=MyBytesIO())
+    @mock.patch('sys.stdin', mock.Mock(**{'fileno.return_value': 0}))
+    @mock.patch('sys.stdout', mock.Mock(**{'fileno.return_value': 1}))
+    @mock.patch('sys.stderr', mock.Mock(**{'fileno.return_value': 2}))
+    def test_with_pidfile(self, mock_open, mock_getpid, mock_close, mock_dup2,
+                          mock_os_open, mock_setsid, mock_exit, mock_fork,
+                          mock_umask, mock_chdir):
+        util.daemonize(pidfile='/some/file.pid')
+
+        mock_chdir.assert_called_once_with('/')
+        mock_umask.assert_called_once_with(0)
+        mock_fork.assert_has_calls([mock.call(), mock.call()])
+        self.assertFalse(mock_exit.called)
+        mock_setsid.assert_called_once_with()
+        mock_os_open.assert_called_once_with(os.devnull, os.O_RDWR)
+        mock_dup2.assert_has_calls([
+            mock.call(3, 0),
+            mock.call(3, 1),
+            mock.call(3, 2),
+        ])
+        mock_close.assert_called_once_with(3)
+        mock_getpid.assert_called_once_with()
+        mock_open.assert_called_once_with('/some/file.pid', 'w')
+        self.assertEqual(mock_open.return_value.contents, '1234\n')
