@@ -141,6 +141,8 @@ class SubmitterApplication(tendril.Application):
                     action='store_false',
                     help='Specifies that SSL should not be used to connect '
                     'to the hub.')
+@cli_tools.argument('--debug', '-d',
+                    help='Enables debugging.')
 def send_notification(hub, app_name, summary, body,
                       urgency=None, category=None, id=None,
                       cert_conf=None, secure=True):
