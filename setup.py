@@ -39,6 +39,7 @@ setup(
     entry_points={
         'console_scripts': [
             'heyu-notify = heyu.submitter:send_notification.console',
+            'heyu-hub = heyu.hub:start_hub.console',
         ],
     },
 )

@@ -349,3 +349,81 @@ class HubApplication(tendril.Application):
 
         # Clean up client subscriptions, if any
         self.server.unsubscribe(self)
+
+
+@cli_tools.argument('endpoints',
+                    nargs='*',
+                    default=[],
+                    help='Specifies the endpoints (host address and '
+                    'optional port number) that the hub should listen on.  '
+                    'Specify ports by separating them from addresses with a '
+                    'colon.  IPv6 addresses must be enclosed in brackets, '
+                    'i.e., "[::1]:1234".  This is optional; if not given, '
+                    'the hub will listen on the default port on any '
+                    'interface.')
+@cli_tools.argument('--foreground', '-f',
+                    dest='daemon',
+                    default=True,
+                    action='store_false',
+                    help='Specifies that the hub should be run in the '
+                    'foreground.')
+@cli_tools.argument('--pid-file', '-p',
+                    default=None,
+                    help='Specifies the file that the PID should be stored '
+                    'in.  There is no default for the PID file.')
+@cli_tools.argument('--cert-conf', '-C',
+                    default=None,
+                    help='Specifies an alternate path to the certificate '
+                    'configuration file.')
+@cli_tools.argument('--insecure', '-k',
+                    dest='secure',
+                    default=True,
+                    action='store_false',
+                    help='Specifies that SSL should not be used to connect '
+                    'to the hub.')
+@cli_tools.argument('--debug', '-d',
+                    help='Enables debugging.')
+def start_hub(endpoints, cert_conf=None, secure=True):
+    """
+    Starts the HeyU hub.  Note that certificate configuration is
+    specified in "~/.heyu.cert" by default.
+
+    :param endpoints: A list of endpoints to listen on.  An endpoint
+                      is a tuple of the local address and the port
+                      number.
+    :param cert_conf: The path to the certificate configuration file.
+                      Optional.
+    :param secure: If ``False``, SSL will not be used.  Defaults to
+                   ``True``.
+    """
+
+    # Initialize the server
+    server = HubServer(endpoints)
+
+    # Start it
+    server.start(cert_conf, secure)
+
+
+@start_hub.processor
+def _normalize_args(args):
+    """
+    Pre-process arguments before calling ``start_hub()``.  This
+    ensures the arguments are normalized.
+
+    :params args: The values of the command line arguments for
+                  normalization.
+    """
+
+    # If no endpoints have been set up, set up the defaults
+    if not args.endpoints:
+        args.endpoints = [('', util.HEYU_PORT)]
+        if socket.has_ipv6:
+            args.endpoints.append(('::', util.HEYU_PORT))
+    else:
+        # Resolve the endpoints
+        args.endpoints = [util.parse_hub(endpoint)
+                          for endpoint in args.endpoints]
+
+    # Go into the background if requested, and not in debug mode
+    if args.daemon and not args.debug:
+        utils.daemonize(pidfile=args.pid_file)
