@@ -50,8 +50,6 @@ class HubServer(object):
         self._running = False
 
         # Set up the tendril managers
-        if not endpoints:
-            endpoints = (('', 0),)
         for endpoint in endpoints:
             self._listeners[endpoint] = tendril.get_manager('tcp', endpoint)
 
