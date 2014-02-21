@@ -424,4 +424,4 @@ def _normalize_args(args):
 
     # Go into the background if requested, and not in debug mode
     if args.daemon and not args.debug:
-        utils.daemonize(pidfile=args.pid_file)
+        util.daemonize(pidfile=args.pid_file)
