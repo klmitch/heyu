@@ -19,6 +19,7 @@ import unittest
 import mock
 
 from heyu import hub
+from heyu import util
 
 
 class TestException(Exception):
@@ -95,7 +96,7 @@ class HubServerTest(unittest.TestCase):
         mock_HubApplication.assert_called_once_with('tendril', server)
 
     @mock.patch.object(hub.HubServer, '__init__', return_value=None)
-    @mock.patch('heyu.util.cert_wrapper', return_value='wrapper')
+    @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     def test_start_running(self, mock_cert_wrapper, mock_init):
         server = hub.HubServer()
         server._listeners = {
@@ -109,7 +110,7 @@ class HubServerTest(unittest.TestCase):
         self.assertFalse(mock_cert_wrapper.called)
 
     @mock.patch.object(hub.HubServer, '__init__', return_value=None)
-    @mock.patch('heyu.util.cert_wrapper', return_value='wrapper')
+    @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     def test_start_basic(self, mock_cert_wrapper, mock_init):
         server = hub.HubServer()
         server._listeners = {
@@ -127,7 +128,7 @@ class HubServerTest(unittest.TestCase):
             manager.start.assert_called_once_with(server._acceptor, 'wrapper')
 
     @mock.patch.object(hub.HubServer, '__init__', return_value=None)
-    @mock.patch('heyu.util.cert_wrapper', return_value='wrapper')
+    @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     def test_start_nolisteners(self, mock_cert_wrapper, mock_init):
         server = hub.HubServer()
         server._listeners = {}
@@ -341,3 +342,574 @@ class HubServerTest(unittest.TestCase):
             else:
                 client.send_frame.assert_called_once_with(
                     'version %d' % version)
+
+
+class HubApplicationTest(unittest.TestCase):
+    @mock.patch('tendril.Application.__init__', return_value=None)
+    @mock.patch('tendril.COBSFramer', return_value='framer')
+    @mock.patch('socket.getfqdn', return_value='fqdn')
+    @mock.patch('socket.getnameinfo', return_value=('host', 1234))
+    def test_init_localipv4(self, mock_getnameinfo, mock_getfqdn,
+                            mock_COBSFramer, mock_init):
+        parent = mock.Mock(addr=('127.0.0.1', 4321))
+
+        app = hub.HubApplication(parent, 'server')
+
+        self.assertEqual('server', app.server)
+        self.assertEqual(False, app.persist)
+        self.assertEqual('fqdn', app.hostname)
+        mock_init.assert_called_once_with(parent)
+        mock_COBSFramer.assert_called_once_with(True)
+        self.assertEqual('framer', parent.framers)
+        mock_getfqdn.assert_called_once_with()
+        self.assertFalse(mock_getnameinfo.called)
+
+    @mock.patch('tendril.Application.__init__', return_value=None)
+    @mock.patch('tendril.COBSFramer', return_value='framer')
+    @mock.patch('socket.getfqdn', return_value='fqdn')
+    @mock.patch('socket.getnameinfo', return_value=('host', 1234))
+    def test_init_localipv6(self, mock_getnameinfo, mock_getfqdn,
+                            mock_COBSFramer, mock_init):
+        parent = mock.Mock(addr=('::1', 4321))
+
+        app = hub.HubApplication(parent, 'server')
+
+        self.assertEqual('server', app.server)
+        self.assertEqual(False, app.persist)
+        self.assertEqual('fqdn', app.hostname)
+        mock_init.assert_called_once_with(parent)
+        mock_COBSFramer.assert_called_once_with(True)
+        self.assertEqual('framer', parent.framers)
+        mock_getfqdn.assert_called_once_with()
+        self.assertFalse(mock_getnameinfo.called)
+
+    @mock.patch('tendril.Application.__init__', return_value=None)
+    @mock.patch('tendril.COBSFramer', return_value='framer')
+    @mock.patch('socket.getfqdn', return_value='fqdn')
+    @mock.patch('socket.getnameinfo', return_value=('host', 1234))
+    def test_init_remote(self, mock_getnameinfo, mock_getfqdn,
+                         mock_COBSFramer, mock_init):
+        parent = mock.Mock(addr=('10.0.0.1', 4321))
+
+        app = hub.HubApplication(parent, 'server')
+
+        self.assertEqual('server', app.server)
+        self.assertEqual(False, app.persist)
+        self.assertEqual('host', app.hostname)
+        mock_init.assert_called_once_with(parent)
+        mock_COBSFramer.assert_called_once_with(True)
+        self.assertEqual('framer', parent.framers)
+        self.assertFalse(mock_getfqdn.called)
+        mock_getnameinfo.assert_called_once_with(('10.0.0.1', 4321), 0)
+
+    @mock.patch('tendril.Application.__init__', return_value=None)
+    @mock.patch('tendril.COBSFramer', return_value='framer')
+    @mock.patch('socket.getfqdn', return_value='fqdn')
+    @mock.patch('socket.getnameinfo', side_effect=TestException('error'))
+    def test_init_bad_resolve(self, mock_getnameinfo, mock_getfqdn,
+                              mock_COBSFramer, mock_init):
+        parent = mock.Mock(addr=('10.0.0.1', 4321))
+
+        app = hub.HubApplication(parent, 'server')
+
+        self.assertEqual('server', app.server)
+        self.assertEqual(False, app.persist)
+        self.assertEqual('10.0.0.1', app.hostname)
+        mock_init.assert_called_once_with(parent)
+        mock_COBSFramer.assert_called_once_with(True)
+        self.assertEqual('framer', parent.framers)
+        self.assertFalse(mock_getfqdn.called)
+        mock_getnameinfo.assert_called_once_with(('10.0.0.1', 4321), 0)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'some frame',
+    }), **{'from_frame.side_effect': ValueError('failed to decode')})
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    @mock.patch.object(hub.HubApplication, 'notify')
+    @mock.patch.object(hub.HubApplication, 'subscribe')
+    @mock.patch.object(hub.HubApplication, 'disconnect')
+    def test_recv_frame_decodeerror(self, mock_disconnect, mock_subscribe,
+                                    mock_notify, mock_close, mock_send_frame,
+                                    mock_init, mock_Message):
+        app = hub.HubApplication()
+
+        app.recv_frame('test')
+
+        mock_Message.from_frame.assert_called_once_with('test')
+        mock_Message.assert_called_once_with(
+            'error', reason='Failed to decode message: failed to decode')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('some frame')
+        mock_close.assert_called_once_with()
+        self.assertFalse(mock_notify.called)
+        self.assertFalse(mock_subscribe.called)
+        self.assertFalse(mock_disconnect.called)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'some frame',
+    }), **{'from_frame.return_value': mock.Mock(msg_type='unknown')})
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    @mock.patch.object(hub.HubApplication, 'notify')
+    @mock.patch.object(hub.HubApplication, 'subscribe')
+    @mock.patch.object(hub.HubApplication, 'disconnect')
+    def test_recv_frame_unknownmsg(self, mock_disconnect, mock_subscribe,
+                                   mock_notify, mock_close, mock_send_frame,
+                                   mock_init, mock_Message):
+        app = hub.HubApplication()
+
+        app.recv_frame('test')
+
+        mock_Message.from_frame.assert_called_once_with('test')
+        mock_Message.assert_called_once_with(
+            'error', reason='Unknown message type "unknown"')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('some frame')
+        mock_close.assert_called_once_with()
+        self.assertFalse(mock_notify.called)
+        self.assertFalse(mock_subscribe.called)
+        self.assertFalse(mock_disconnect.called)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'some frame',
+    }), **{'from_frame.return_value': mock.Mock(msg_type='notify')})
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    @mock.patch.object(hub.HubApplication, 'notify')
+    @mock.patch.object(hub.HubApplication, 'subscribe')
+    @mock.patch.object(hub.HubApplication, 'disconnect')
+    def test_recv_frame_notify(self, mock_disconnect, mock_subscribe,
+                               mock_notify, mock_close, mock_send_frame,
+                               mock_init, mock_Message):
+        app = hub.HubApplication()
+
+        app.recv_frame('test')
+
+        mock_Message.from_frame.assert_called_once_with('test')
+        self.assertFalse(mock_Message.called)
+        self.assertFalse(mock_send_frame.called)
+        self.assertFalse(mock_close.called)
+        mock_notify.assert_called_once_with(
+            mock_Message.from_frame.return_value)
+        self.assertFalse(mock_subscribe.called)
+        self.assertFalse(mock_disconnect.called)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'some frame',
+    }), **{'from_frame.return_value': mock.Mock(msg_type='subscribe')})
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    @mock.patch.object(hub.HubApplication, 'notify')
+    @mock.patch.object(hub.HubApplication, 'subscribe')
+    @mock.patch.object(hub.HubApplication, 'disconnect')
+    def test_recv_frame_subscribe(self, mock_disconnect, mock_subscribe,
+                                  mock_notify, mock_close, mock_send_frame,
+                                  mock_init, mock_Message):
+        app = hub.HubApplication()
+
+        app.recv_frame('test')
+
+        mock_Message.from_frame.assert_called_once_with('test')
+        self.assertFalse(mock_Message.called)
+        self.assertFalse(mock_send_frame.called)
+        self.assertFalse(mock_close.called)
+        self.assertFalse(mock_notify.called)
+        mock_subscribe.assert_called_once_with(
+            mock_Message.from_frame.return_value)
+        self.assertFalse(mock_disconnect.called)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'some frame',
+    }), **{'from_frame.return_value': mock.Mock(msg_type='goodbye')})
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    @mock.patch.object(hub.HubApplication, 'notify')
+    @mock.patch.object(hub.HubApplication, 'subscribe')
+    @mock.patch.object(hub.HubApplication, 'disconnect')
+    def test_recv_frame_goodbye(self, mock_disconnect, mock_subscribe,
+                                mock_notify, mock_close, mock_send_frame,
+                                mock_init, mock_Message):
+        app = hub.HubApplication()
+
+        app.recv_frame('test')
+
+        mock_Message.from_frame.assert_called_once_with('test')
+        self.assertFalse(mock_Message.called)
+        self.assertFalse(mock_send_frame.called)
+        self.assertFalse(mock_close.called)
+        self.assertFalse(mock_notify.called)
+        self.assertFalse(mock_subscribe.called)
+        mock_disconnect.assert_called_once_with()
+
+    @mock.patch('uuid.uuid4', return_value='some-uuid')
+    @mock.patch('heyu.protocol.Message')
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_notify_success(self, mock_close, mock_send_frame, mock_init,
+                            mock_Message, mock_uuid4):
+        msgs = {
+            'notify': 'notification',
+            'error': mock.Mock(**{'to_frame.return_value': 'error'}),
+            'accepted': mock.Mock(**{'to_frame.return_value': 'accepted'}),
+        }
+        mock_Message.side_effect = lambda x, **kw: msgs[x]
+        msg = mock.Mock(id=None, app_name='app', summary='summary',
+                        body='body', urgency='urgency', category='category')
+        app = hub.HubApplication()
+        app.hostname = 'host'
+        app.server = mock.Mock()
+        app.persist = True
+
+        app.notify(msg)
+
+        mock_uuid4.assert_called_once_with()
+        mock_Message.assert_has_calls([
+            mock.call('notify', id='some-uuid', app_name='[host]app',
+                      summary='summary', body='body', urgency='urgency',
+                      category='category'),
+            mock.call('accepted', id='some-uuid'),
+        ])
+        app.server.submit.assert_called_once_with('notification')
+        self.assertFalse(msgs['error'].to_frame.called)
+        msgs['accepted'].to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('accepted')
+        self.assertFalse(mock_close.called)
+
+    @mock.patch('uuid.uuid4', return_value='some-uuid')
+    @mock.patch('heyu.protocol.Message')
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_notify_provided_id(self, mock_close, mock_send_frame, mock_init,
+                                mock_Message, mock_uuid4):
+        msgs = {
+            'notify': 'notification',
+            'error': mock.Mock(**{'to_frame.return_value': 'error'}),
+            'accepted': mock.Mock(**{'to_frame.return_value': 'accepted'}),
+        }
+        mock_Message.side_effect = lambda x, **kw: msgs[x]
+        msg = mock.Mock(id='my-id', app_name='app', summary='summary',
+                        body='body', urgency='urgency', category='category')
+        app = hub.HubApplication()
+        app.hostname = 'host'
+        app.server = mock.Mock()
+        app.persist = True
+
+        app.notify(msg)
+
+        self.assertFalse(mock_uuid4.called)
+        mock_Message.assert_has_calls([
+            mock.call('notify', id='my-id', app_name='[host]app',
+                      summary='summary', body='body', urgency='urgency',
+                      category='category'),
+            mock.call('accepted', id='my-id'),
+        ])
+        app.server.submit.assert_called_once_with('notification')
+        self.assertFalse(msgs['error'].to_frame.called)
+        msgs['accepted'].to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('accepted')
+        self.assertFalse(mock_close.called)
+
+    @mock.patch('uuid.uuid4', return_value='some-uuid')
+    @mock.patch('heyu.protocol.Message')
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_notify_no_persist(self, mock_close, mock_send_frame, mock_init,
+                               mock_Message, mock_uuid4):
+        msgs = {
+            'notify': 'notification',
+            'error': mock.Mock(**{'to_frame.return_value': 'error'}),
+            'accepted': mock.Mock(**{'to_frame.return_value': 'accepted'}),
+        }
+        mock_Message.side_effect = lambda x, **kw: msgs[x]
+        msg = mock.Mock(id=None, app_name='app', summary='summary',
+                        body='body', urgency='urgency', category='category')
+        app = hub.HubApplication()
+        app.hostname = 'host'
+        app.server = mock.Mock()
+        app.persist = False
+
+        app.notify(msg)
+
+        mock_uuid4.assert_called_once_with()
+        mock_Message.assert_has_calls([
+            mock.call('notify', id='some-uuid', app_name='[host]app',
+                      summary='summary', body='body', urgency='urgency',
+                      category='category'),
+            mock.call('accepted', id='some-uuid'),
+        ])
+        app.server.submit.assert_called_once_with('notification')
+        self.assertFalse(msgs['error'].to_frame.called)
+        msgs['accepted'].to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('accepted')
+        mock_close.assert_called_once_with()
+
+    @mock.patch('uuid.uuid4', return_value='some-uuid')
+    @mock.patch('heyu.protocol.Message')
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_notify_failure(self, mock_close, mock_send_frame, mock_init,
+                            mock_Message, mock_uuid4):
+        msgs = {
+            'notify': 'notification',
+            'error': mock.Mock(**{'to_frame.return_value': 'error'}),
+            'accepted': mock.Mock(**{'to_frame.return_value': 'accepted'}),
+        }
+        mock_Message.side_effect = lambda x, **kw: msgs[x]
+        msg = mock.Mock(id=None, app_name='app', summary='summary',
+                        body='body', urgency='urgency', category='category')
+        app = hub.HubApplication()
+        app.hostname = 'host'
+        app.server = mock.Mock(**{
+            'submit.side_effect': TestException('failed'),
+        })
+        app.persist = True
+
+        app.notify(msg)
+
+        mock_uuid4.assert_called_once_with()
+        mock_Message.assert_has_calls([
+            mock.call('notify', id='some-uuid', app_name='[host]app',
+                      summary='summary', body='body', urgency='urgency',
+                      category='category'),
+            mock.call('error', reason='Failed to submit notification: failed'),
+        ])
+        app.server.submit.assert_called_once_with('notification')
+        msgs['error'].to_frame.assert_called_once_with()
+        self.assertFalse(msgs['accepted'].to_frame.called)
+        mock_send_frame.assert_called_once_with('error')
+        self.assertFalse(mock_close.called)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'frame',
+    }))
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_subscribe_success(self, mock_close, mock_send_frame, mock_init,
+                               mock_Message):
+        msg = mock.Mock(version=1)
+        app = hub.HubApplication()
+        app.persist = False
+        app.server = mock.Mock()
+
+        app.subscribe(msg)
+
+        app.server.subscribe.assert_called_once_with(app, 1)
+        mock_Message.assert_called_once_with('subscribed')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('frame')
+        self.assertFalse(mock_close.called)
+        self.assertEqual(True, app.persist)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'frame',
+    }))
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_subscribe_failure(self, mock_close, mock_send_frame, mock_init,
+                               mock_Message):
+        msg = mock.Mock(version=1)
+        app = hub.HubApplication()
+        app.persist = False
+        app.server = mock.Mock(**{
+            'subscribe.side_effect': TestException('failed'),
+        })
+
+        app.subscribe(msg)
+
+        app.server.subscribe.assert_called_once_with(app, 1)
+        mock_Message.assert_called_once_with(
+            'error', reason='Failed to subscribe: failed')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('frame')
+        mock_close.assert_called_once_with()
+        self.assertEqual(False, app.persist)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'frame',
+    }))
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame')
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_disconnect_success(self, mock_close, mock_send_frame, mock_init,
+                                mock_Message):
+        app = hub.HubApplication()
+        app.server = mock.Mock()
+
+        app.disconnect()
+
+        app.server.unsubscribe.assert_called_once_with(app)
+        mock_Message.assert_called_once_with('goodbye')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('frame')
+        mock_close.assert_called_once_with()
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'frame',
+    }))
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    @mock.patch.object(hub.HubApplication, 'send_frame',
+                       side_effect=TestException('test'))
+    @mock.patch.object(hub.HubApplication, 'close')
+    def test_disconnect_failure(self, mock_close, mock_send_frame, mock_init,
+                                mock_Message):
+        app = hub.HubApplication()
+        app.server = mock.Mock()
+
+        app.disconnect()
+
+        app.server.unsubscribe.assert_called_once_with(app)
+        mock_Message.assert_called_once_with('goodbye')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('frame')
+        mock_close.assert_called_once_with()
+
+    @mock.patch.object(hub.HubApplication, '__init__', return_value=None)
+    def test_closed(self, mock_init):
+        app = hub.HubApplication()
+        app.server = mock.Mock()
+
+        app.closed(None)
+
+        app.server.unsubscribe.assert_called_once_with(app)
+
+
+class StartHubTest(unittest.TestCase):
+    @mock.patch.object(hub, 'HubServer')
+    def test_basic(self, mock_HubServer):
+        hub.start_hub(['ep1', 'ep2', 'ep3'])
+
+        mock_HubServer.assert_called_once_with(['ep1', 'ep2', 'ep3'])
+        mock_HubServer.return_value.start.assert_called_once_with(None, True)
+
+    @mock.patch.object(hub, 'HubServer')
+    def test_alts(self, mock_HubServer):
+        hub.start_hub(['ep1', 'ep2', 'ep3'], 'cert_conf', False)
+
+        mock_HubServer.assert_called_once_with(['ep1', 'ep2', 'ep3'])
+        mock_HubServer.return_value.start.assert_called_once_with(
+            'cert_conf', False)
+
+
+class NormalizeArgsTest(unittest.TestCase):
+    @mock.patch('socket.has_ipv6', False)
+    @mock.patch.object(util, 'parse_hub', side_effect=lambda x: x)
+    @mock.patch.object(util, 'daemonize')
+    def test_no_endpoints_v4(self, mock_daemonize, mock_parse_hub):
+        args = mock.Mock(
+            endpoints=[],
+            daemon=True,
+            debug=False,
+            pid_file=None,
+        )
+
+        hub._normalize_args(args)
+
+        self.assertEqual([('', util.HEYU_PORT)], args.endpoints)
+        self.assertFalse(mock_parse_hub.called)
+        mock_daemonize.assert_called_once_with(pidfile=None)
+
+    @mock.patch('socket.has_ipv6', True)
+    @mock.patch.object(util, 'parse_hub', side_effect=lambda x: x)
+    @mock.patch.object(util, 'daemonize')
+    def test_no_endpoints_v6(self, mock_daemonize, mock_parse_hub):
+        args = mock.Mock(
+            endpoints=[],
+            daemon=True,
+            debug=False,
+            pid_file=None,
+        )
+
+        hub._normalize_args(args)
+
+        self.assertEqual([('', util.HEYU_PORT), ('::', util.HEYU_PORT)],
+                         args.endpoints)
+        self.assertFalse(mock_parse_hub.called)
+        mock_daemonize.assert_called_once_with(pidfile=None)
+
+    @mock.patch('socket.has_ipv6', True)
+    @mock.patch.object(util, 'parse_hub', side_effect=lambda x: (x, 1234))
+    @mock.patch.object(util, 'daemonize')
+    def test_with_endpoints(self, mock_daemonize, mock_parse_hub):
+        args = mock.Mock(
+            endpoints=['ep1', 'ep2', 'ep3'],
+            daemon=True,
+            debug=False,
+            pid_file=None,
+        )
+
+        hub._normalize_args(args)
+
+        self.assertEqual([('ep1', 1234), ('ep2', 1234), ('ep3', 1234)],
+                         args.endpoints)
+        mock_parse_hub.assert_has_calls([
+            mock.call('ep1'),
+            mock.call('ep2'),
+            mock.call('ep3'),
+        ])
+        mock_daemonize.assert_called_once_with(pidfile=None)
+
+    @mock.patch('socket.has_ipv6', True)
+    @mock.patch.object(util, 'parse_hub', side_effect=lambda x: x)
+    @mock.patch.object(util, 'daemonize')
+    def test_daemonize_debug(self, mock_daemonize, mock_parse_hub):
+        args = mock.Mock(
+            endpoints=[],
+            daemon=True,
+            debug=True,
+            pid_file=None,
+        )
+
+        hub._normalize_args(args)
+
+        self.assertEqual([('', util.HEYU_PORT), ('::', util.HEYU_PORT)],
+                         args.endpoints)
+        self.assertFalse(mock_parse_hub.called)
+        self.assertFalse(mock_daemonize.called)
+
+    @mock.patch('socket.has_ipv6', True)
+    @mock.patch.object(util, 'parse_hub', side_effect=lambda x: x)
+    @mock.patch.object(util, 'daemonize')
+    def test_daemonize_nodaemon(self, mock_daemonize, mock_parse_hub):
+        args = mock.Mock(
+            endpoints=[],
+            daemon=False,
+            debug=False,
+            pid_file=None,
+        )
+
+        hub._normalize_args(args)
+
+        self.assertEqual([('', util.HEYU_PORT), ('::', util.HEYU_PORT)],
+                         args.endpoints)
+        self.assertFalse(mock_parse_hub.called)
+        self.assertFalse(mock_daemonize.called)
+
+    @mock.patch('socket.has_ipv6', True)
+    @mock.patch.object(util, 'parse_hub', side_effect=lambda x: x)
+    @mock.patch.object(util, 'daemonize')
+    def test_daemonize_pidfile(self, mock_daemonize, mock_parse_hub):
+        args = mock.Mock(
+            endpoints=[],
+            daemon=True,
+            debug=False,
+            pid_file='/path/to/pid',
+        )
+
+        hub._normalize_args(args)
+
+        self.assertEqual([('', util.HEYU_PORT), ('::', util.HEYU_PORT)],
+                         args.endpoints)
+        self.assertFalse(mock_parse_hub.called)
+        mock_daemonize.assert_called_once_with(pidfile='/path/to/pid')
