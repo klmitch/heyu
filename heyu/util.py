@@ -15,6 +15,7 @@
 
 from __future__ import print_function
 
+import argparse
 import ConfigParser
 import os
 import re
@@ -80,6 +81,45 @@ def parse_hub(hub):
                            (hostname, e))
 
     return result[0][4]
+
+
+def default_hub():
+    """
+    Retrieve the default hub specification.
+
+    :returns: A tuple of the hostname and integer port number.
+    """
+
+    # Start off by trying to parse ~/.heyu.hub
+    try:
+        with open(os.path.expanduser('~/.heyu.hub')) as f:
+            return parse_hub(f.read().strip())
+    except Exception:
+        # Return our default
+        return ('127.0.0.1', HEYU_PORT)
+
+
+class HubAction(argparse.Action):
+    """
+    An ``argparse.Action`` subclass capable of parsing hub
+    specifications.
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Parse the value of an argument used for identifying a hub.
+        Attempts to resolve the hub to a tuple, then stores that tuple
+        into the appropriate place of the namespace.
+
+        :param parser: The ``argparse.ArgumentParser`` instance.
+        :param namespace: The namespace into which the result will be
+                          placed.
+        :param values: The textual value of the argument.
+        :param option_string: The option string that was used.
+        """
+
+        # Parse the hub and store it into the namespace
+        setattr(namespace, self.dest, parse_hub(values))
 
 
 def outgoing_endpoint(target):

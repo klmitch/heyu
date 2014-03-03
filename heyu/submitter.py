@@ -125,7 +125,9 @@ class SubmitterApplication(tendril.Application):
                     default=None,
                     help='Specifies the notification category.')
 @cli_tools.argument('--host', '-H',
-                    default=None,
+                    dest='hub',
+                    action=util.HubAction,
+                    default=util.default_hub(),
                     help='Specifies the HeyU hub to submit the '
                     'notification to, as "hostname" or "hostname:port".')
 @cli_tools.argument('--id', '-I',
@@ -191,21 +193,6 @@ def _normalize_args(args):
     :param args: The values of the command line arguments for
                  normalization.
     """
-
-    # Start off with the hub data
-    hub = args.hub
-    if hub is None:
-        try:
-            with open(os.path.expanduser('~/.heyu.hub')) as f:
-                hub = f.read().strip()  # pragma: no cover
-        except IOError:
-            hub = None
-
-    # Do we have a hub?
-    if not hub:
-        args.hub = ('127.0.0.1', util.HEYU_PORT)
-    else:
-        args.hub = util.parse_hub(hub)
 
     # Next, we need the application name
     if not args.app_name:

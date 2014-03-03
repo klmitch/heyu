@@ -122,6 +122,50 @@ class ParseHubTest(unittest.TestCase):
             '::1', 1234, 0, socket.SOCK_STREAM)
 
 
+class DefaultHubTest(unittest.TestCase):
+    @mock.patch('os.path.expanduser', return_value='/home/user/.heyu.hub')
+    @mock.patch('__builtin__.open', side_effect=IOError())
+    @mock.patch.object(util, 'parse_hub', return_value=('1.2.3.4', 1234))
+    def test_no_hub_file(self, mock_parse_hub, mock_open, mock_expanduser):
+        result = util.default_hub()
+
+        self.assertEqual(('127.0.0.1', util.HEYU_PORT), result)
+        mock_open.assert_called_once_with('/home/user/.heyu.hub')
+        self.assertFalse(mock_parse_hub.called)
+
+    @mock.patch('os.path.expanduser', return_value='/home/user/.heyu.hub')
+    @mock.patch('__builtin__.open', return_value=io.BytesIO('hub\n'))
+    @mock.patch.object(util, 'parse_hub', side_effect=util.HubException())
+    def test_no_hub_resolv(self, mock_parse_hub, mock_open, mock_expanduser):
+        result = util.default_hub()
+
+        self.assertEqual(('127.0.0.1', util.HEYU_PORT), result)
+        mock_open.assert_called_once_with('/home/user/.heyu.hub')
+        mock_parse_hub.assert_called_once_with('hub')
+
+    @mock.patch('os.path.expanduser', return_value='/home/user/.heyu.hub')
+    @mock.patch('__builtin__.open', return_value=io.BytesIO('hub\n'))
+    @mock.patch.object(util, 'parse_hub', return_value=('1.2.3.4', 1234))
+    def test_default_hub(self, mock_parse_hub, mock_open, mock_expanduser):
+        result = util.default_hub()
+
+        self.assertEqual(('1.2.3.4', 1234), result)
+        mock_open.assert_called_once_with('/home/user/.heyu.hub')
+        mock_parse_hub.assert_called_once_with('hub')
+
+
+class HubActionTest(unittest.TestCase):
+    @mock.patch.object(util, 'parse_hub', return_value=('1.2.3.4', 1234))
+    def test_hub_action(self, mock_parse_hub):
+        namespace = mock.Mock(dest=None)
+        action = util.HubAction([], 'dest')
+
+        action('parser', namespace, 'hub')
+
+        self.assertEqual(('1.2.3.4', 1234), namespace.dest)
+        mock_parse_hub.assert_called_once_with('hub')
+
+
 class OutgoingEndpointTest(unittest.TestCase):
     @mock.patch('tendril.addr_info', return_value=socket.AF_INET)
     def test_ipv4(self, mock_addr_info):
