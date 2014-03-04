@@ -138,7 +138,7 @@ class HubServer(object):
             manager.shutdown()
 
         # All subscriber connections were closed by shutdown, so clear
-        # the the sibscribers list
+        # the the subscribers list
         self._subscribers = {}
 
         self._running = False
