@@ -20,9 +20,9 @@ import ConfigParser
 import os
 import re
 import socket
-import ssl
 import sys
 
+from gevent import ssl
 import tendril
 
 

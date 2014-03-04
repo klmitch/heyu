@@ -17,9 +17,9 @@ import ConfigParser
 import io
 import os
 import socket
-import ssl
 import unittest
 
+from gevent import ssl
 import mock
 
 from heyu import util
