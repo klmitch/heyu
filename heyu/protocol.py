@@ -28,6 +28,9 @@ urgency_map = {
     'critical': URGENCY_CRITICAL,
 }
 
+# A level to name map
+urgency_names = dict((v, k) for k, v in urgency_map.items())
+
 # The current protocol version.  An entry for this must exist in the
 # _versions dictionary.
 _curr_version = 0
