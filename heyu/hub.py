@@ -34,7 +34,7 @@ class HubServer(object):
 
     def __init__(self, endpoints):
         """
-        Initialize a ``Server`` object.
+        Initialize a ``HubServer`` object.
 
         :param endpoints: A list of tuples of addresses and ports to
                           listen on.
