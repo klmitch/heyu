@@ -42,5 +42,8 @@ setup(
             'heyu-hub = heyu.hub:start_hub.console',
             'heyu-notifier = heyu.notifier:notification_server.console',
         ],
+        'heyu.notifier': [
+            'stdout = heyu.notifier:stdout_notification_driver',
+        ],
     },
 )

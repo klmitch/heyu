@@ -403,3 +403,44 @@ def notification_server():
     """
 
     pass  # pragma: no cover
+
+
+@cli_tools.console
+def stdout_notification_driver(hub, cert_conf=None, secure=True):
+    """
+    Standard output notification driver.  This emits notifications to
+    standard output.  Does not attempt to maintain a connection to the
+    HeyU hub.  This driver is mostly useful for debugging.
+
+    :param hub: The address of the hub, as a tuple of hostname and
+                port.
+    :param cert_conf: The path to the certificate configuration file.
+                      Optional.
+    :param secure: If ``False``, SSL will not be used.  Defaults to
+                   ``True``.
+    """
+
+    # Keep track of the number of notifications seen
+    count = 0
+
+    # Set up the server
+    server = NotifierServer(hub, cert_conf, secure)
+
+    # Consume notifications
+    for msg in server:
+        if count:
+            # Need a newline to separate
+            print()
+
+        count += 1
+
+        # Print out the notification data
+        print("ID %s, urgency %s" %
+              (msg.id, protocol.urgency_names[msg.urgency]))
+        print("Application: %s" % msg.app_name)
+        print("    Summary: %s" % msg.summary)
+        print("       Body: %s" % msg.body)
+        print("   Category: %s" % msg.category)
+
+    # Indicate how many we counted
+    print("\nNotifications received: %d" % count)
