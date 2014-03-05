@@ -236,7 +236,7 @@ class NotifierServer(object):
         self._notify_event.set()
 
 
-class NotifierApplication(object):
+class NotifierApplication(tendril.Application):
     """
     The application for the notifier, which subscribes to
     notifications from the HeyU server.
