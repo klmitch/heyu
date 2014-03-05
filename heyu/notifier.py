@@ -15,6 +15,7 @@
 
 from __future__ import print_function
 
+import os
 import signal
 import sys
 import uuid
@@ -41,7 +42,7 @@ class NotifierServer(object):
     handle.
     """
 
-    def __init__(self, hub, cert_conf=None, secure=True, app_name='notifier',
+    def __init__(self, hub, cert_conf=None, secure=True, app_name=None,
                  app_id=None):
         """
         Initialize a ``NotifierServer`` object.
@@ -52,8 +53,9 @@ class NotifierServer(object):
                           file.  Optional.
         :param secure: If ``False``, SSL will not be used.  Defaults
                        to ``True``.
-        :param app_name: The name of the application.  Defaults to
-                         "notifier".
+        :param app_name: The name of the application.  If not
+                         specified, the name is derived from
+                         ``sys.argv[0]``.
         :param app_id: A UUID for notifications generated internal to
                        the notifier.  If not specified, a random UUID
                        will be generated.
@@ -65,7 +67,7 @@ class NotifierServer(object):
         self._wrapper = util.cert_wrapper(cert_conf, 'notifier', secure=secure)
 
         # Save the app name and ID
-        self._app_name = app_name
+        self._app_name = app_name or os.path.basename(sys.argv[0])
         self._app_id = app_id or str(uuid.uuid4())
 
         # Track running status and the queue of notifications
