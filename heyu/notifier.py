@@ -78,10 +78,10 @@ class NotifierServer(object):
         # Set up behavior on signals
         gevent.signal(signal.SIGINT, self.stop)
         gevent.signal(signal.SIGTERM, self.stop)
-        try:
+        try:  # pragma: no cover
             # Force an immediate shutdown
             gevent.signal(signal.SIGUSR1, self.shutdown)
-        except Exception:
+        except Exception:  # pragma: no cover
             # Ignore errors; SIGUSR1 isn't everywhere
             pass
 
