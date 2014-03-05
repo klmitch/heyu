@@ -316,8 +316,8 @@ class NotifierApplication(tendril.Application):
             else:
                 # Unknown message type from the server
                 self.notify('Unknown Server Message', 'An unrecognized '
-                            'server message of type "%s" was received.',
-                            ERROR)
+                            'server message of type "%s" was received.' %
+                            msg.msg_type, ERROR)
 
                 # It should be safe to just ignore the message
         except ValueError as e:
