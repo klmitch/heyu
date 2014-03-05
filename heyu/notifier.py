@@ -215,7 +215,7 @@ class NotifierServer(object):
         # Shut down the manager
         self._manager.shutdown()
 
-        # The client was closed by the shutdown, so clear _running
+        # The client was closed by the shutdown, so clear _hub_app
         self._hub_app = None
 
         # This also clears the pending notifications
