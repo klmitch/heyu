@@ -27,6 +27,16 @@ class TestException(Exception):
 
 
 class HubServerTest(unittest.TestCase):
+    def _signal_test(self, hub_server, mock_signal):
+        signals = [
+            mock.call(signal.SIGINT, hub_server.stop),
+            mock.call(signal.SIGTERM, hub_server.stop),
+        ]
+        if hasattr(signal, 'SIGUSR1'):
+            signals.append(mock.call(signal.SIGUSR1, hub_server.shutdown))
+        mock_signal.assert_has_calls(signals)
+        self.assertEqual(len(signals), mock_signal.call_count)
+
     @mock.patch('tendril.get_manager', side_effect=lambda a, b: b)
     @mock.patch('gevent.signal')
     def test_init_basic(self, mock_signal, mock_get_manager):
@@ -36,31 +46,7 @@ class HubServerTest(unittest.TestCase):
         self.assertEqual({}, result._listeners)
         self.assertEqual(False, result._running)
         self.assertFalse(mock_get_manager.called)
-        mock_signal.assert_has_calls([
-            mock.call(signal.SIGINT, result.stop),
-            mock.call(signal.SIGTERM, result.stop),
-            mock.call(signal.SIGUSR1, result.shutdown),
-        ])
-
-    @mock.patch('tendril.get_manager', side_effect=lambda a, b: b)
-    @mock.patch('gevent.signal')
-    def test_init_failusr1(self, mock_signal, mock_get_manager):
-        def fake_signal(num, handler):
-            if num == signal.SIGUSR1:
-                raise TestException('test')
-        mock_signal.side_effect = fake_signal
-
-        result = hub.HubServer([])
-
-        self.assertEqual({}, result._subscribers)
-        self.assertEqual({}, result._listeners)
-        self.assertEqual(False, result._running)
-        self.assertFalse(mock_get_manager.called)
-        mock_signal.assert_has_calls([
-            mock.call(signal.SIGINT, result.stop),
-            mock.call(signal.SIGTERM, result.stop),
-            mock.call(signal.SIGUSR1, result.shutdown),
-        ])
+        self._signal_test(result, mock_signal)
 
     @mock.patch('tendril.get_manager', side_effect=lambda a, b: b)
     @mock.patch('gevent.signal')
@@ -79,11 +65,7 @@ class HubServerTest(unittest.TestCase):
             mock.call('tcp', 'ep2'),
             mock.call('tcp', 'ep3'),
         ], any_order=True)
-        mock_signal.assert_has_calls([
-            mock.call(signal.SIGINT, result.stop),
-            mock.call(signal.SIGTERM, result.stop),
-            mock.call(signal.SIGUSR1, result.shutdown),
-        ])
+        self._signal_test(result, mock_signal)
 
     @mock.patch.object(hub.HubServer, '__init__', return_value=None)
     @mock.patch.object(hub, 'HubApplication', return_value='app')
