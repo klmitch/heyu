@@ -40,6 +40,7 @@ setup(
         'console_scripts': [
             'heyu-notify = heyu.submitter:send_notification.console',
             'heyu-hub = heyu.hub:start_hub.console',
+            'heyu-notifier = heyu.notifier:notification_server.console',
         ],
     },
 )
