@@ -328,3 +328,233 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual(['notification'], server._notifications)
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
+
+
+class NotifierApplicationTest(unittest.TestCase):
+    @mock.patch('tendril.Application.__init__', return_value=None)
+    @mock.patch('tendril.COBSFramer', return_value='framer')
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'some frame',
+    }))
+    @mock.patch.object(notifier.NotifierApplication, 'send_frame')
+    def test_init(self, mock_send_frame, mock_Message,
+                  mock_COBSFramer, mock_init):
+        parent = mock.Mock()
+        result = notifier.NotifierApplication(parent, 'server',
+                                              'app_name', 'app_id')
+
+        self.assertEqual('server', result.server)
+        self.assertEqual('app_name', result.app_name)
+        self.assertEqual('app_id', result.app_id)
+        self.assertEqual('framer', parent.framers)
+        mock_init.assert_called_once_with(parent)
+        mock_COBSFramer.assert_called_once_with(True)
+        mock_Message.assert_called_once_with('subscribe')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('some frame')
+
+    @mock.patch('heyu.protocol.Message.from_frame',
+                side_effect=ValueError('failed to decode'))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
+    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    def test_recv_frame_decodeerror(self, mock_closed, mock_disconnect,
+                                    mock_notify, mock_init, mock_from_frame):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.recv_frame('test')
+
+        mock_from_frame.assert_called_once_with('test')
+        mock_notify.assert_called_once_with(
+            'Failed To Parse Server Message',
+            'Unable to parse a message from the server: failed to decode',
+            notifier.ERROR)
+        mock_disconnect.assert_called_once_with()
+        self.assertFalse(mock_closed.called)
+        app.server.stop.assert_called_once_with()
+        self.assertFalse(app.server.notify.called)
+
+    @mock.patch('heyu.protocol.Message.from_frame', return_value=mock.Mock(
+        msg_type='unknown'))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
+    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    def test_recv_frame_unknownmsg(self, mock_closed, mock_disconnect,
+                                   mock_notify, mock_init, mock_from_frame):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.recv_frame('test')
+
+        mock_from_frame.assert_called_once_with('test')
+        mock_notify.assert_called_once_with(
+            'Unknown Server Message',
+            'An unrecognized server message of type "unknown" was received.',
+            notifier.ERROR)
+        self.assertFalse(mock_disconnect.called)
+        self.assertFalse(mock_closed.called)
+        self.assertFalse(app.server.stop.called)
+        self.assertFalse(app.server.notify.called)
+
+    @mock.patch('heyu.protocol.Message.from_frame', return_value=mock.Mock(
+        msg_type='error', reason='some error'))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
+    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    def test_recv_frame_error(self, mock_closed, mock_disconnect,
+                              mock_notify, mock_init, mock_from_frame):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.recv_frame('test')
+
+        mock_from_frame.assert_called_once_with('test')
+        mock_notify.assert_called_once_with(
+            'Communication Error',
+            'An error occurred communicating with the HeyU hub: some error',
+            notifier.ERROR)
+        mock_disconnect.assert_called_once_with()
+        self.assertFalse(mock_closed.called)
+        app.server.stop.assert_called_once_with()
+        self.assertFalse(app.server.notify.called)
+
+    @mock.patch('heyu.protocol.Message.from_frame', return_value=mock.Mock(
+        msg_type='goodbye'))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
+    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    def test_recv_frame_goodbye(self, mock_closed, mock_disconnect,
+                                mock_notify, mock_init, mock_from_frame):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.recv_frame('test')
+
+        mock_from_frame.assert_called_once_with('test')
+        self.assertFalse(mock_notify.called)
+        mock_disconnect.assert_called_once_with()
+        mock_closed.assert_called_once_with(None)
+        self.assertFalse(app.server.stop.called)
+        self.assertFalse(app.server.notify.called)
+
+    @mock.patch('heyu.protocol.Message.from_frame', return_value=mock.Mock(
+        msg_type='subscribed'))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
+    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    def test_recv_frame_subscribed(self, mock_closed, mock_disconnect,
+                                   mock_notify, mock_init, mock_from_frame):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.recv_frame('test')
+
+        mock_from_frame.assert_called_once_with('test')
+        mock_notify.assert_called_once_with(
+            'Connection Established',
+            'The connection to the HeyU hub has been established.',
+            notifier.CONNECTED)
+        self.assertFalse(mock_disconnect.called)
+        self.assertFalse(mock_closed.called)
+        self.assertFalse(app.server.stop.called)
+        self.assertFalse(app.server.notify.called)
+
+    @mock.patch('heyu.protocol.Message.from_frame', return_value=mock.Mock(
+        msg_type='notify'))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
+    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    def test_recv_frame_notify(self, mock_closed, mock_disconnect,
+                               mock_notify, mock_init, mock_from_frame):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.recv_frame('test')
+
+        mock_from_frame.assert_called_once_with('test')
+        self.assertFalse(mock_notify.called)
+        self.assertFalse(mock_disconnect.called)
+        self.assertFalse(mock_closed.called)
+        self.assertFalse(app.server.stop.called)
+        app.server.notify.assert_called_once_with(mock_from_frame.return_value)
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'frame',
+    }))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'send_frame')
+    @mock.patch.object(notifier.NotifierApplication, 'close')
+    def test_disconnect_success(self, mock_close, mock_send_frame, mock_init,
+                                mock_Message):
+        app = notifier.NotifierApplication()
+
+        app.disconnect()
+
+        mock_Message.assert_called_once_with('goodbye')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('frame')
+        mock_close.assert_called_once_with()
+
+    @mock.patch('heyu.protocol.Message', return_value=mock.Mock(**{
+        'to_frame.return_value': 'frame',
+    }))
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'send_frame',
+                       side_effect=TestException('test'))
+    @mock.patch.object(notifier.NotifierApplication, 'close')
+    def test_disconnect_failure(self, mock_close, mock_send_frame, mock_init,
+                                mock_Message):
+        app = notifier.NotifierApplication()
+
+        app.disconnect()
+
+        mock_Message.assert_called_once_with('goodbye')
+        mock_Message.return_value.to_frame.assert_called_once_with()
+        mock_send_frame.assert_called_once_with('frame')
+        mock_close.assert_called_once_with()
+
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    def test_closed(self, mock_notify, mock_init):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+
+        app.closed(None)
+
+        mock_notify.assert_called_once_with(
+            'Connection Closed',
+            'The connection to the HeyU hub has been closed.',
+            notifier.DISCONNECTED)
+        app.server.stop.assert_called_once_with()
+
+    @mock.patch('heyu.protocol.Message', return_value='notification')
+    @mock.patch.object(notifier.NotifierApplication, '__init__',
+                       return_value=None)
+    def test_notify(self, mock_init, mock_Message):
+        app = notifier.NotifierApplication()
+        app.server = mock.Mock()
+        app.app_name = 'app_name'
+        app.app_id = 'app_id'
+
+        app.notify('summary', 'body', 'category')
+
+        mock_Message.assert_called_once_with(
+            'notify', summary='summary', body='body', category='category',
+            app_name='app_name', id='app_id')
+        app.server.notify.assert_called_once_with('notification')
