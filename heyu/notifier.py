@@ -16,6 +16,7 @@
 from __future__ import print_function
 
 import signal
+import sys
 import uuid
 
 import cli_tools
@@ -111,10 +112,17 @@ class NotifierServer(object):
             # If there's a notification on the queue, pop it off and
             # return it
             try:
-                return self._notifications.pop(0)
+                msg = self._notifications.pop(0)
             except IndexError:
                 # Indicates there are no notifications...
                 self._notify_event.clear()
+            else:
+                # A notification of None indicates that it's time to
+                # exit
+                if msg is None:
+                    sys.exit()
+
+                return msg
 
             # Are we still running?
             if self._hub_app is None:
@@ -182,6 +190,11 @@ class NotifierServer(object):
 
         self._hub_app = None
 
+        # If arguments were passed, we were called via a signal; add a
+        # sentinel to the queue to indicate that we should exit
+        if args:
+            self._notifications.append(None)
+
         # Set the flag on the event to ensure next() doesn't block
         self._notify_event.set()
 
@@ -204,7 +217,7 @@ class NotifierServer(object):
         self._hub_app = None
 
         # This also clears the pending notifications
-        self._notifications = []
+        self._notifications = [None]
 
         # Set the flag on the event to ensure next() doesn't block
         self._notify_event.set()
