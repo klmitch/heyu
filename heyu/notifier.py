@@ -151,14 +151,16 @@ class NotifierServer(object):
         if self._hub_app is not None:
             raise ValueError('server is already running')
 
+        # The connection is being initiated but isn't yet complete;
+        # we'll use True to differentiate that from the actual
+        # application so we can handle the case properly in stop().
+        # We set this here since the TCP manager in Tendril doesn't
+        # return from connect() until the acceptor has returned.
+        self._hub_app = True
+
         # Start the manager and connect to the hub
         self._manager.start()
         manager.connect(self._hub, self._acceptor, self._wrapper)
-
-        # The connection has been initiated but isn't yet complete;
-        # we'll use True to differentiate that from the actual
-        # application so we can handle the case properly in stop()
-        self._hub_app = True
 
     def stop(self, *args):
         """
