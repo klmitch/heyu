@@ -170,7 +170,7 @@ class NotifierServer(object):
 
         # Start the manager and connect to the hub
         self._manager.start()
-        manager.connect(self._hub, self._acceptor, self._wrapper)
+        self._manager.connect(self._hub, self._acceptor, self._wrapper)
 
     def stop(self, *args):
         """
