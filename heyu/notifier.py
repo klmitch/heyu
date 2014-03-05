@@ -402,4 +402,4 @@ def notification_server():
     subcommand.
     """
 
-    pass
+    pass  # pragma: no cover
