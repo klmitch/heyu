@@ -46,6 +46,7 @@ setup(
             'stdout = heyu.notifier:stdout_notification_driver',
             'file = heyu.notifier:file_notification_driver',
             'script = heyu.notifier:script_notification_driver',
+            'gtk = heyu.gtk:gtk_notification_driver',
         ],
     },
 )
