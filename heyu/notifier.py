@@ -545,7 +545,7 @@ def script_notification_driver(script, hub, cert_conf=None, secure=True):
             'application': msg.app_name,
             'summary': msg.summary,
             'body': msg.body,
-            'category': msg.category,
+            'category': msg.category or '',
             'urgency': protocol.urgency_names[msg.urgency],
         }
 
