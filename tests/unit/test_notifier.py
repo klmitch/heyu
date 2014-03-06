@@ -601,3 +601,50 @@ class StdoutNotificationDriverTest(unittest.TestCase):
             '\n'
             'Notifications received: 3\n',
             sys.stdout.getvalue())
+
+
+class MyBytesIO(io.BytesIO):
+    """
+    Override close() to preserve the emitted contents.
+    """
+
+    def close(self):
+        self.contents = self.getvalue()
+        super(MyBytesIO, self).close()
+
+
+class FileNotificationDriverTest(unittest.TestCase):
+    @mock.patch('__builtin__.open', return_value=MyBytesIO())
+    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+        mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
+                  app_name='application-1', summary='summary-1', body='body-1',
+                  category='cat-1'),
+        mock.Mock(id='notify-2', urgency=protocol.URGENCY_NORMAL,
+                  app_name='application-2', summary='summary-2', body='body-2',
+                  category=None),
+        mock.Mock(id='notify-3', urgency=protocol.URGENCY_CRITICAL,
+                  app_name='application-3', summary='summary-3', body='body-3',
+                  category='cat-3'),
+    ])
+    def test_output(self, mock_NotifierServer, mock_open):
+        notifier.file_notification_driver('file', 'hub')
+
+        mock_open.assert_called_once_with('file', 'a')
+        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        self.assertEqual(
+            'ID notify-1, urgency low\n'
+            'Application: application-1\n'
+            '    Summary: summary-1\n'
+            '       Body: body-1\n'
+            '   Category: cat-1\n'
+            'ID notify-2, urgency normal\n'
+            'Application: application-2\n'
+            '    Summary: summary-2\n'
+            '       Body: body-2\n'
+            '   Category: None\n'
+            'ID notify-3, urgency critical\n'
+            'Application: application-3\n'
+            '    Summary: summary-3\n'
+            '       Body: body-3\n'
+            '   Category: cat-3\n',
+            mock_open.return_value.contents)

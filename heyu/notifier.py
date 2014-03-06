@@ -444,3 +444,38 @@ def stdout_notification_driver(hub, cert_conf=None, secure=True):
 
     # Indicate how many we counted
     print("\nNotifications received: %d" % count)
+
+
+@cli_tools.argument('filename',
+                    help='The file to write notifications to.')
+def file_notification_driver(filename, hub, cert_conf=None, secure=True):
+    """
+    File notification driver.  This appends notifications to a named
+    file.  Does not attempt to maintain a connection to the HeyU hub.
+    Notifications are formatted similarly to the output of the
+    "stdout" notification driver, sans extra whitespace.
+
+    :param filename: The name of the file to which to emit the
+                     notifications.
+    :param hub: The address of the hub, as a tuple of hostname and
+                port.
+    :param cert_conf: The path to the certificate configuration file.
+                      Optional.
+    :param secure: If ``False``, SSL will not be used.  Defaults to
+                   ``True``.
+    """
+
+    # Open the file...
+    with open(filename, 'a') as output:
+        # Set up the server
+        server = NotifierServer(hub, cert_conf, secure)
+
+        # Consume notifications
+        for msg in server:
+            print("ID %s, urgency %s" %
+                  (msg.id, protocol.urgency_names[msg.urgency]),
+                  file=output)
+            print("Application: %s" % msg.app_name, file=output)
+            print("    Summary: %s" % msg.summary, file=output)
+            print("       Body: %s" % msg.body, file=output)
+            print("   Category: %s" % msg.category, file=output)
