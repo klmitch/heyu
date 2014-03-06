@@ -16,8 +16,6 @@
 from __future__ import print_function
 
 import os
-import re
-import shlex
 import signal
 import string
 import subprocess
@@ -485,11 +483,39 @@ def file_notification_driver(filename, hub, cert_conf=None, secure=True):
             print("   Category: %s" % msg.category, file=output)
 
 
+# Recognized substitution fields
+_known_fields = frozenset(['id', 'application', 'summary', 'body',
+                           'category', 'urgency'])
+
+
+def _validate_subs(text):
+    """
+    Validate substitutions in the given text.  Raises a value error if
+    a substitution is not recognized.
+
+    :param text: The text to validate substitutions in.
+
+    :returns: The text.
+    """
+
+    for data in string.Formatter().parse(text):
+        # Does it use a field unknown to us?
+        if data[1] is not None and data[1] not in _known_fields:
+            raise ValueError('unknown substitution "{%s}"' % data[1])
+
+    return text
+
+
 @cli_tools.argument('script',
+                    nargs='*',
+                    default=[],
+                    type=_validate_subs,
                     help='The script to invoke.  The tokens "{id}", '
                     '"{application}", "{summary}", "{body}", "{category}", '
                     'and "{urgency}" will be substituted with the appropriate '
-                    'values from the notification.')
+                    'values from the notification.  It is recommended to '
+                    'precede the script value with "--" to prevent argument '
+                    'interpretation.')
 def script_notification_driver(script, hub, cert_conf=None, secure=True):
     """
     Script notification driver.  This invokes a given executable for
@@ -531,63 +557,3 @@ def script_notification_driver(script, hub, cert_conf=None, secure=True):
             subprocess.call(cmd)
         except Exception as e:
             print("Failed to call %s: %s" % (cmd[0], e), file=sys.stderr)
-
-
-# Recognized substitution fields
-_known_fields = frozenset(['id', 'application', 'summary', 'body',
-                           'category', 'urgency'])
-
-# Need to double { and } in literal text
-_double_re = re.compile('([{}])')
-
-
-@script_notification_driver.processor
-def _interpret_script(args):
-    """
-    Pre-process arguments to properly lexify the script.  We use
-    ``shlex.split()`` to obtain a list of tokens, then use a
-    ``string.Formatter`` to parse each token.  We ignore undefined
-    substitutions in this parsing, quoting them to allow later
-    formatting.
-
-    :params args: The values of the command line arguments.
-    """
-
-    # Set up a Formatter instance and prepare our storage location
-    fmt = string.Formatter()
-    script = []
-
-    # Lexify the script passed in...
-    for elem in shlex.split(args.script):
-        # Parse the element
-        elem_reparsed = ''
-        for literal, field, fmt_spec, conversion in fmt.parse(elem):
-            # Handle literal text first
-            if literal:
-                elem_reparsed += _double_re.sub(r'\1\1', literal)
-
-            # If there's no field, go on to the next element
-            if field is None:
-                continue
-
-            # Make sure we understand the field
-            if field in _known_fields:
-                pre, post = '{', '}'
-            else:
-                pre, post = '{{', '}}'
-
-            # Reassemble the field
-            field_text = field
-            if conversion:
-                field_text += '!%s' % conversion
-            if fmt_spec:
-                field_text += ':%s' % fmt_spec
-
-            # Add it to the element text
-            elem_reparsed += '%s%s%s' % (pre, field_text, post)
-
-        # Add the reconstructed element to the script list
-        script.append(elem_reparsed)
-
-    # Update the script
-    args.script = script
