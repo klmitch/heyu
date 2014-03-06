@@ -237,6 +237,22 @@ class NotifierServer(object):
         self._notifications.append(msg)
         self._notify_event.set()
 
+    @property
+    def app_name(self):
+        """
+        Retrieve the application name.
+        """
+
+        return self._app_name
+
+    @property
+    def app_id(self):
+        """
+        Retrieve the application ID.
+        """
+
+        return self._app_id
+
 
 class NotifierApplication(tendril.Application):
     """

@@ -332,6 +332,20 @@ class NotifierServerTest(unittest.TestCase):
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
 
+    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    def test_app_name(self, mock_init):
+        server = notifier.NotifierServer()
+        server._app_name = 'app_name'
+
+        self.assertEqual('app_name', server.app_name)
+
+    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    def test_app_id(self, mock_init):
+        server = notifier.NotifierServer()
+        server._app_id = 'app_id'
+
+        self.assertEqual('app_id', server.app_id)
+
 
 class NotifierApplicationTest(unittest.TestCase):
     @mock.patch('tendril.Application.__init__', return_value=None)
