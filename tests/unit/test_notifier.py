@@ -648,3 +648,117 @@ class FileNotificationDriverTest(unittest.TestCase):
             '       Body: body-3\n'
             '   Category: cat-3\n',
             mock_open.return_value.contents)
+
+
+class ValidateSubsTest(unittest.TestCase):
+    def test_no_substitutions(self):
+        exemplar = 'this is a test'
+
+        result = notifier._validate_subs(exemplar)
+
+        self.assertEqual(exemplar, result)
+
+    def test_known_substitutions(self):
+        exemplar = '{id} {application} {summary} {body} {category} {urgency}'
+
+        result = notifier._validate_subs(exemplar)
+
+        self.assertEqual(exemplar, result)
+
+    def test_substitutions_passthrough(self):
+        exemplar = '{id} {id!r} {id: ^23s}'
+
+        result = notifier._validate_subs(exemplar)
+
+        self.assertEqual(exemplar, result)
+
+    def test_bad_char(self):
+        self.assertRaises(ValueError, notifier._validate_subs, 'foo { bar')
+
+    def test_bad_field(self):
+        self.assertRaises(ValueError, notifier._validate_subs, '{unknown}')
+
+
+class ScriptNotificationDriverTest(unittest.TestCase):
+    @mock.patch.object(sys, 'stderr', io.BytesIO())
+    @mock.patch('subprocess.call')
+    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+        mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
+                  app_name='application-1', summary='summary-1', body='body-1',
+                  category='cat-1'),
+        mock.Mock(id='notify-2', urgency=protocol.URGENCY_NORMAL,
+                  app_name='application-2', summary='summary-2', body='body-2',
+                  category=None),
+        mock.Mock(id='notify-3', urgency=protocol.URGENCY_CRITICAL,
+                  app_name='application-3', summary='summary-3', body='body-3',
+                  category='cat-3'),
+    ])
+    def test_basic(self, mock_NotifierServer, mock_call):
+        notifier.script_notification_driver([
+            'command', 'id={id}', 'application={application}',
+            'summary={summary}', 'body={body}', 'category={category}',
+            'urgency={urgency}',
+        ], 'hub')
+
+        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        self.assertEqual('', sys.stderr.getvalue())
+        mock_call.assert_has_calls([
+            mock.call([
+                'command', 'id=notify-1', 'application=application-1',
+                'summary=summary-1', 'body=body-1', 'category=cat-1',
+                'urgency=low',
+            ]),
+            mock.call([
+                'command', 'id=notify-2', 'application=application-2',
+                'summary=summary-2', 'body=body-2', 'category=',
+                'urgency=normal',
+            ]),
+            mock.call([
+                'command', 'id=notify-3', 'application=application-3',
+                'summary=summary-3', 'body=body-3', 'category=cat-3',
+                'urgency=critical',
+            ]),
+        ])
+
+    @mock.patch.object(sys, 'stderr', io.BytesIO())
+    @mock.patch('subprocess.call', side_effect=TestException('bad command'))
+    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+        mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
+                  app_name='application-1', summary='summary-1', body='body-1',
+                  category='cat-1'),
+        mock.Mock(id='notify-2', urgency=protocol.URGENCY_NORMAL,
+                  app_name='application-2', summary='summary-2', body='body-2',
+                  category=None),
+        mock.Mock(id='notify-3', urgency=protocol.URGENCY_CRITICAL,
+                  app_name='application-3', summary='summary-3', body='body-3',
+                  category='cat-3'),
+    ])
+    def test_error(self, mock_NotifierServer, mock_call):
+        notifier.script_notification_driver([
+            'command', 'id={id}', 'application={application}',
+            'summary={summary}', 'body={body}', 'category={category}',
+            'urgency={urgency}',
+        ], 'hub')
+
+        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        self.assertEqual('Failed to call command: bad command\n'
+                         'Failed to call command: bad command\n'
+                         'Failed to call command: bad command\n',
+                         sys.stderr.getvalue())
+        mock_call.assert_has_calls([
+            mock.call([
+                'command', 'id=notify-1', 'application=application-1',
+                'summary=summary-1', 'body=body-1', 'category=cat-1',
+                'urgency=low',
+            ]),
+            mock.call([
+                'command', 'id=notify-2', 'application=application-2',
+                'summary=summary-2', 'body=body-2', 'category=',
+                'urgency=normal',
+            ]),
+            mock.call([
+                'command', 'id=notify-3', 'application=application-3',
+                'summary=summary-3', 'body=body-3', 'category=cat-3',
+                'urgency=critical',
+            ]),
+        ])
