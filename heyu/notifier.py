@@ -383,8 +383,8 @@ class NotifierApplication(tendril.Application):
 
 @cli_tools.argument('--host', '-H',
                     dest='hub',
-                    action=util.HubAction,
                     default=util.default_hub(),
+                    type=util.parse_hub,
                     help='Specifies the HeyU hub to subscribe to '
                     'notifications from, as "hostname" or "hostname:port".')
 @cli_tools.argument('--cert-conf', '-C',

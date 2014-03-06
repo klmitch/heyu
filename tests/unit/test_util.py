@@ -154,18 +154,6 @@ class DefaultHubTest(unittest.TestCase):
         mock_parse_hub.assert_called_once_with('hub')
 
 
-class HubActionTest(unittest.TestCase):
-    @mock.patch.object(util, 'parse_hub', return_value=('1.2.3.4', 1234))
-    def test_hub_action(self, mock_parse_hub):
-        namespace = mock.Mock(dest=None)
-        action = util.HubAction([], 'dest')
-
-        action('parser', namespace, 'hub')
-
-        self.assertEqual(('1.2.3.4', 1234), namespace.dest)
-        mock_parse_hub.assert_called_once_with('hub')
-
-
 class OutgoingEndpointTest(unittest.TestCase):
     @mock.patch('tendril.addr_info', return_value=socket.AF_INET)
     def test_ipv4(self, mock_addr_info):

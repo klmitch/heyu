@@ -99,29 +99,6 @@ def default_hub():
         return ('127.0.0.1', HEYU_PORT)
 
 
-class HubAction(argparse.Action):
-    """
-    An ``argparse.Action`` subclass capable of parsing hub
-    specifications.
-    """
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        """
-        Parse the value of an argument used for identifying a hub.
-        Attempts to resolve the hub to a tuple, then stores that tuple
-        into the appropriate place of the namespace.
-
-        :param parser: The ``argparse.ArgumentParser`` instance.
-        :param namespace: The namespace into which the result will be
-                          placed.
-        :param values: The textual value of the argument.
-        :param option_string: The option string that was used.
-        """
-
-        # Parse the hub and store it into the namespace
-        setattr(namespace, self.dest, parse_hub(values))
-
-
 def outgoing_endpoint(target):
     """
     The ``tendril.get_manager()`` function must be called with the
