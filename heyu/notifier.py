@@ -16,7 +16,11 @@
 from __future__ import print_function
 
 import os
+import re
+import shlex
 import signal
+import string
+import subprocess
 import sys
 import uuid
 
@@ -479,3 +483,111 @@ def file_notification_driver(filename, hub, cert_conf=None, secure=True):
             print("    Summary: %s" % msg.summary, file=output)
             print("       Body: %s" % msg.body, file=output)
             print("   Category: %s" % msg.category, file=output)
+
+
+@cli_tools.argument('script',
+                    help='The script to invoke.  The tokens "{id}", '
+                    '"{application}", "{summary}", "{body}", "{category}", '
+                    'and "{urgency}" will be substituted with the appropriate '
+                    'values from the notification.')
+def script_notification_driver(script, hub, cert_conf=None, secure=True):
+    """
+    Script notification driver.  This invokes a given executable for
+    each notification, with notification values indicated by
+    substitutions.
+
+    :param script: The script command arguments, as a list.  The first
+                   argument should be the executable, specified as
+                   either an absolute path or the short name of an
+                   executable in the current PATH.
+    :param hub: The address of the hub, as a tuple of hostname and
+                port.
+    :param cert_conf: The path to the certificate configuration file.
+                      Optional.
+    :param secure: If ``False``, SSL will not be used.  Defaults to
+                   ``True``.
+    """
+
+    # Set up the server
+    server = NotifierServer(hub, cert_conf, secure)
+
+    # Consume notifications
+    for msg in server:
+        # Build a dictionary of substitutions
+        subs = {
+            'id': msg.id,
+            'application': msg.app_name,
+            'summary': msg.summary,
+            'body': msg.body,
+            'category': msg.category,
+            'urgency': protocol.urgency_names[msg.urgency],
+        }
+
+        # Substitute into the script list
+        cmd = [arg.format(**subs) for arg in script]
+
+        # Invoke the script
+        try:
+            subprocess.call(cmd)
+        except Exception as e:
+            print("Failed to call %s: %s" % (cmd[0], e), file=sys.stderr)
+
+
+# Recognized substitution fields
+_known_fields = frozenset(['id', 'application', 'summary', 'body',
+                           'category', 'urgency'])
+
+# Need to double { and } in literal text
+_double_re = re.compile('([{}])')
+
+
+@script_notification_driver.processor
+def _interpret_script(args):
+    """
+    Pre-process arguments to properly lexify the script.  We use
+    ``shlex.split()`` to obtain a list of tokens, then use a
+    ``string.Formatter`` to parse each token.  We ignore undefined
+    substitutions in this parsing, quoting them to allow later
+    formatting.
+
+    :params args: The values of the command line arguments.
+    """
+
+    # Set up a Formatter instance and prepare our storage location
+    fmt = string.Formatter()
+    script = []
+
+    # Lexify the script passed in...
+    for elem in shlex.split(args.script):
+        # Parse the element
+        elem_reparsed = ''
+        for literal, field, fmt_spec, conversion in fmt.parse(elem):
+            # Handle literal text first
+            if literal:
+                elem_reparsed += _double_re.sub(r'\1\1', literal)
+
+            # If there's no field, go on to the next element
+            if field is None:
+                continue
+
+            # Make sure we understand the field
+            if field in _known_fields:
+                pre, post = '{', '}'
+            else:
+                pre, post = '{{', '}}'
+
+            # Reassemble the field
+            field_text = field
+            if conversion:
+                field_text += '!%s' % conversion
+            if fmt_spec:
+                field_text += ':%s' % fmt_spec
+
+            # Add it to the element text
+            elem_reparsed += '%s%s%s' % (pre, field_text, post)
+
+        # Add the reconstructed element to the script list
+        script.append(elem_reparsed)
+
+    # Update the script
+    args.script = script
