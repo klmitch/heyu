@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+
 import cli_tools
 
 try:
@@ -24,8 +26,85 @@ from heyu import notifier
 from heyu import protocol
 
 
-@cli_tools.console
-def gtk_notification_driver(hub, cert_conf=None, secure=True):
+def backoff(max_sleep, threshold, recover):
+    """
+    A generator that performs exponential backoff by sleeping each
+    time through with a constantly updated sleep time.  When the
+    operation is successful (elapsed time greater than the
+    ``threshold``), the sleep time is scaled back linearly by the
+    ``recover`` factor; when unsuccessful, the sleep time is increased
+    exponentially until the maximum sleep time is reached.
+
+    :param max_sleep: The maximum number of seconds that ``backoff()``
+                      will sleep for.
+    :param threshold: The minimum number of seconds required for the
+                      operation to be considered successful.  Before
+                      ``threshold``, sleep time is increased
+                      exponentially; after ``threshold``, sleep time
+                      is decreased linearly.
+    :param recover: A scaling factor used for linear decrease in the
+                    sleep time.  The elapsed time is divided by this
+                    factor, truncated to integer, and subtracted from
+                    the last sleep time, when the operation is
+                    successful.
+    """
+
+    # Initialize the factors from the previous iteration of the loop
+    last_time = time.time()
+    last_sleep = 0
+
+    # An infinite generator
+    while True:
+        # Perform the operation.  Success or failure is judged based
+        # on the amount of time before execution continues in this
+        # context, under control of the threshold parameter.
+        yield
+
+        # Calculate the elapsed time
+        curr_time = time.time()
+        elapsed = curr_time - last_time
+
+        # Was the operation successful?
+        if elapsed < threshold:
+            # No, double the last_sleep time, capping at max_sleep
+            next_sleep = min(max(last_sleep * 2, 1), max_sleep)
+        else:
+            # Yes, linearly scale the last_sleep time with a minimum
+            # of 0
+            next_sleep = max(last_sleep - int(elapsed / recover), 0)
+
+        # Sleep...
+        time.sleep(next_sleep)
+
+        # Prepare for the next trip around the loop
+        last_time = curr_time
+        last_sleep = next_sleep
+
+
+@cli_tools.argument('--max-backoff', '-B',
+                    default=300,
+                    type=int,
+                    help='The maximum amount of backoff, in seconds.  After '
+                    'a connection failure, this is the maximum amount of time '
+                    'to sleep prior to the next attempt to connect.')
+@cli_tools.argument('--threshold', '-T',
+                    default=30,
+                    type=int,
+                    help='The minimum number of seconds before the connection '
+                    'is considered a success.  If the connection fails prior '
+                    'to this, the time before the next attempt is doubled.  '
+                    'If the connection fails after this, the time before the '
+                    'next attempt is reduced linearly.')
+@cli_tools.argument('--recover', '-R',
+                    default=5,
+                    type=int,
+                    help='The scaling factor for the linear reduction of the '
+                    'time to the next connection attempt.  The number of '
+                    'seconds since the last attempt is divided by this '
+                    'factor and used to reduce the time before the next '
+                    'connection attempt.')
+def gtk_notification_driver(hub, cert_conf=None, secure=True,
+                            max_sleep=300, threshold=30, recover=5):
     """
     GTK notification driver.  This uses the PyGTK package "pynotify"
     to generate desktop notifications from the notifications received
@@ -37,6 +116,18 @@ def gtk_notification_driver(hub, cert_conf=None, secure=True):
                       Optional.
     :param secure: If ``False``, SSL will not be used.  Defaults to
                    ``True``.
+    :param max_sleep: The maximum number of seconds that ``backoff()``
+                      will sleep for.
+    :param threshold: The minimum number of seconds required for the
+                      operation to be considered successful.  Before
+                      ``threshold``, sleep time is increased
+                      exponentially; after ``threshold``, sleep time
+                      is decreased linearly.
+    :param recover: A scaling factor used for linear decrease in the
+                    sleep time.  The elapsed time is divided by this
+                    factor, truncated to integer, and subtracted from
+                    the last sleep time, when the operation is
+                    successful.
     """
 
     # Set up the server
@@ -57,7 +148,7 @@ def gtk_notification_driver(hub, cert_conf=None, secure=True):
     notifications[server.app_id].show()
 
     # Keep connected to the HeyU hub
-    while True:
+    for _dummy in backoff(max_sleep, threshold, recover):
         # Consume notifications
         for msg in server:
             # Get a Notification instance
