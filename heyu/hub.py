@@ -218,13 +218,14 @@ class HubApplication(tendril.Application):
 
         # Determine the hostname of the client
         try:
-            if parent.addr[0] in ('127.0.0.1', '::1'):
+            if parent.remote_addr[0] in ('127.0.0.1', '::1'):
                 self.hostname = socket.getfqdn()
             else:
-                self.hostname, _port = socket.getnameinfo(parent.addr, 0)
+                self.hostname, _port = socket.getnameinfo(parent.remote_addr,
+                                                          0)
         except Exception:
             # Just use the bare address
-            self.hostname = parent.addr[0]
+            self.hostname = parent.remote_addr[0]
 
     def recv_frame(self, frame):
         """

@@ -335,7 +335,7 @@ class HubApplicationTest(unittest.TestCase):
     @mock.patch('socket.getnameinfo', return_value=('host', 1234))
     def test_init_localipv4(self, mock_getnameinfo, mock_getfqdn,
                             mock_COBSFramer, mock_init):
-        parent = mock.Mock(addr=('127.0.0.1', 4321))
+        parent = mock.Mock(remote_addr=('127.0.0.1', 4321))
 
         app = hub.HubApplication(parent, 'server')
 
@@ -354,7 +354,7 @@ class HubApplicationTest(unittest.TestCase):
     @mock.patch('socket.getnameinfo', return_value=('host', 1234))
     def test_init_localipv6(self, mock_getnameinfo, mock_getfqdn,
                             mock_COBSFramer, mock_init):
-        parent = mock.Mock(addr=('::1', 4321))
+        parent = mock.Mock(remote_addr=('::1', 4321))
 
         app = hub.HubApplication(parent, 'server')
 
@@ -373,7 +373,7 @@ class HubApplicationTest(unittest.TestCase):
     @mock.patch('socket.getnameinfo', return_value=('host', 1234))
     def test_init_remote(self, mock_getnameinfo, mock_getfqdn,
                          mock_COBSFramer, mock_init):
-        parent = mock.Mock(addr=('10.0.0.1', 4321))
+        parent = mock.Mock(remote_addr=('10.0.0.1', 4321))
 
         app = hub.HubApplication(parent, 'server')
 
@@ -392,7 +392,7 @@ class HubApplicationTest(unittest.TestCase):
     @mock.patch('socket.getnameinfo', side_effect=TestException('error'))
     def test_init_bad_resolve(self, mock_getnameinfo, mock_getfqdn,
                               mock_COBSFramer, mock_init):
-        parent = mock.Mock(addr=('10.0.0.1', 4321))
+        parent = mock.Mock(remote_addr=('10.0.0.1', 4321))
 
         app = hub.HubApplication(parent, 'server')
 
