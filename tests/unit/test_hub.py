@@ -105,7 +105,8 @@ class HubServerTest(unittest.TestCase):
         server.start()
 
         self.assertEqual(True, server._running)
-        mock_cert_wrapper.assert_called_once_with(None, 'hub', secure=True)
+        mock_cert_wrapper.assert_called_once_with(
+            None, 'hub', server_side=True, secure=True)
         for manager in server._listeners.values():
             manager.start.assert_called_once_with(server._acceptor, 'wrapper')
 
@@ -119,7 +120,8 @@ class HubServerTest(unittest.TestCase):
         server.start()
 
         self.assertEqual(True, server._running)
-        mock_cert_wrapper.assert_called_once_with(None, 'hub', secure=True)
+        mock_cert_wrapper.assert_called_once_with(
+            None, 'hub', server_side=True, secure=True)
         for manager in server._listeners.values():
             manager.start.assert_called_once_with(server._acceptor, 'wrapper')
 

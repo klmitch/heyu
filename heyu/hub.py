@@ -92,7 +92,8 @@ class HubServer(object):
             raise ValueError('server is already running')
 
         # Get the wrapper
-        wrapper = util.cert_wrapper(cert_conf, 'hub', secure=secure)
+        wrapper = util.cert_wrapper(cert_conf, 'hub', server_side=True,
+                                    secure=secure)
 
         # Walk through all managers and start them
         for manager in self._listeners.values():
