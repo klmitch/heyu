@@ -237,14 +237,14 @@ def daemonize(workdir='/', pidfile=None):
 
     # Do the first fork
     if os.fork() > 0:
-        os._exit()
+        os._exit(0)
 
     # Make ourself a session leader
     os.setsid()
 
     # Do the second fork
     if os.fork() > 0:
-        os._exit()
+        os._exit(0)
 
     # Redirect standard input, standard output, and standard error
     devnull = os.open(os.devnull, os.O_RDWR)

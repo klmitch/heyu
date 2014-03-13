@@ -475,7 +475,7 @@ class DaemonizeTest(unittest.TestCase):
         mock_chdir.assert_called_once_with('/')
         mock_umask.assert_called_once_with(0)
         mock_fork.assert_has_calls([mock.call(), mock.call()])
-        mock_exit.assert_has_calls([mock.call(), mock.call()])
+        mock_exit.assert_has_calls([mock.call(0), mock.call(0)])
         mock_setsid.assert_called_once_with()
         mock_os_open.assert_called_once_with(os.devnull, os.O_RDWR)
         mock_dup2.assert_has_calls([
