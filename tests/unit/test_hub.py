@@ -768,20 +768,24 @@ class HubApplicationTest(unittest.TestCase):
 
 
 class StartHubTest(unittest.TestCase):
+    @mock.patch('gevent.wait')
     @mock.patch.object(hub, 'HubServer')
-    def test_basic(self, mock_HubServer):
+    def test_basic(self, mock_HubServer, mock_wait):
         hub.start_hub(['ep1', 'ep2', 'ep3'])
 
         mock_HubServer.assert_called_once_with(['ep1', 'ep2', 'ep3'])
         mock_HubServer.return_value.start.assert_called_once_with(None, True)
+        mock_wait.assert_called_once_with()
 
+    @mock.patch('gevent.wait')
     @mock.patch.object(hub, 'HubServer')
-    def test_alts(self, mock_HubServer):
+    def test_alts(self, mock_HubServer, mock_wait):
         hub.start_hub(['ep1', 'ep2', 'ep3'], 'cert_conf', False)
 
         mock_HubServer.assert_called_once_with(['ep1', 'ep2', 'ep3'])
         mock_HubServer.return_value.start.assert_called_once_with(
             'cert_conf', False)
+        mock_wait.assert_called_once_with()
 
 
 class NormalizeArgsTest(unittest.TestCase):

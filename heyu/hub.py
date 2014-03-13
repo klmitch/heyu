@@ -403,6 +403,9 @@ def start_hub(endpoints, cert_conf=None, secure=True):
     # Start it
     server.start(cert_conf, secure)
 
+    # Wait for the hub to exit
+    gevent.wait()
+
 
 @start_hub.processor
 def _normalize_args(args):
