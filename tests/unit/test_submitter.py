@@ -134,12 +134,13 @@ class SubmitterApplicationTest(unittest.TestCase):
 
 
 class SendNotificationTest(unittest.TestCase):
+    @mock.patch('gevent.wait')
     @mock.patch.object(util, 'outgoing_endpoint', return_value='outgoing')
     @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     @mock.patch('tendril.get_manager')
     @mock.patch('tendril.TendrilPartial', return_value='the_app')
     def test_basic(self, mock_TendrilPartial, mock_get_manager,
-                   mock_cert_wrapper, mock_outgoing_endpoint):
+                   mock_cert_wrapper, mock_outgoing_endpoint, mock_wait):
         submitter.send_notification('hub', 'app', 'summary', 'body')
 
         mock_outgoing_endpoint.assert_called_once_with('hub')
@@ -153,13 +154,15 @@ class SendNotificationTest(unittest.TestCase):
             'app', 'summary', 'body', None, None, None)
         mock_cert_wrapper.assert_called_once_with(
             None, 'submitter', secure=True)
+        mock_wait.assert_called_once_with()
 
+    @mock.patch('gevent.wait')
     @mock.patch.object(util, 'outgoing_endpoint', return_value='outgoing')
     @mock.patch.object(util, 'cert_wrapper', return_value='wrapper')
     @mock.patch('tendril.get_manager')
     @mock.patch('tendril.TendrilPartial', return_value='the_app')
     def test_extra(self, mock_TendrilPartial, mock_get_manager,
-                   mock_cert_wrapper, mock_outgoing_endpoint):
+                   mock_cert_wrapper, mock_outgoing_endpoint, mock_wait):
         submitter.send_notification('hub', 'app', 'summary', 'body',
                                     'urgency', 'category', 'id',
                                     'cert_conf', False)
@@ -175,6 +178,7 @@ class SendNotificationTest(unittest.TestCase):
             'app', 'summary', 'body', 'urgency', 'category', 'id')
         mock_cert_wrapper.assert_called_once_with(
             'cert_conf', 'submitter', secure=False)
+        mock_wait.assert_called_once_with()
 
 
 class NormalizeArgsTest(unittest.TestCase):

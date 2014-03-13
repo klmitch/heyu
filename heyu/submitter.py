@@ -19,6 +19,7 @@ import os
 import sys
 
 import cli_tools
+import gevent
 import tendril
 
 from heyu import protocol
@@ -184,6 +185,9 @@ def send_notification(hub, app_name, summary, body,
                                  urgency, category, id)
     wrapper = util.cert_wrapper(cert_conf, 'submitter', secure=secure)
     manager.connect(hub, app, wrapper)
+
+    # Wait for the submitter to exit
+    gevent.wait()
 
 
 @send_notification.processor
