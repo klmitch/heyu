@@ -380,6 +380,8 @@ class HubApplication(tendril.Application):
                     help='Specifies that SSL should not be used to connect '
                     'to the hub.')
 @cli_tools.argument('--debug', '-d',
+                    default=False,
+                    action='store_true',
                     help='Enables debugging.')
 def start_hub(endpoints, cert_conf=None, secure=True):
     """
