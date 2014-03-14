@@ -72,16 +72,16 @@ class BackoffTest(unittest.TestCase):
                 break
 
 
-class GtkNotificationDriverTest(unittest.TestCase):
-    @mock.patch('heyu.notifier.NotifierServer',
+class GtkNotifierTest(unittest.TestCase):
+    @mock.patch('heyu.notifications.NotificationServer',
                 return_value=mock.MagicMock(app_name='app_name',
                                             app_id='app_id'))
     @mock.patch.object(pynotify, 'init')
     @mock.patch.object(pynotify, 'Notification')
     @mock.patch.object(gtk, 'backoff', return_value=range(1))
     def test_basic(self, mock_backoff, mock_Notification, mock_init,
-                   mock_NotifierServer):
-        mock_NotifierServer.return_value.__iter__.return_value = iter([
+                   mock_NotificationServer):
+        mock_NotificationServer.return_value.__iter__.return_value = iter([
             mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
                       app_name='application-1', summary='summary-1',
                       body='body-1', category='cat-1'),
@@ -93,10 +93,10 @@ class GtkNotificationDriverTest(unittest.TestCase):
                       body='body-3', category='cat-3'),
         ])
 
-        gtk.gtk_notification_driver('hub')
+        gtk.gtk_notifier('hub')
 
         mock_backoff.assert_called_once_with(300, 30, 5)
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         mock_init.assert_called_once_with('app_name')
         mock_Notification.assert_has_calls([
             mock.call('Starting', 'app_name is starting up'),
@@ -117,24 +117,24 @@ class GtkNotificationDriverTest(unittest.TestCase):
             mock.call().show(),
         ])
 
-    @mock.patch('heyu.notifier.NotifierServer',
+    @mock.patch('heyu.notifications.NotificationServer',
                 return_value=mock.MagicMock(app_name='app_name',
                                             app_id='app_id'))
     @mock.patch.object(pynotify, 'init')
     @mock.patch.object(pynotify, 'Notification')
     @mock.patch.object(gtk, 'backoff', return_value=range(1))
     def test_replace(self, mock_backoff, mock_Notification, mock_init,
-                     mock_NotifierServer):
-        mock_NotifierServer.return_value.__iter__.return_value = iter([
+                     mock_NotificationServer):
+        mock_NotificationServer.return_value.__iter__.return_value = iter([
             mock.Mock(id='app_id', urgency=protocol.URGENCY_NORMAL,
                       app_name='app_name', summary='summary-1',
                       body='body-1', category='cat-1'),
         ])
 
-        gtk.gtk_notification_driver('hub')
+        gtk.gtk_notifier('hub')
 
         mock_backoff.assert_called_once_with(300, 30, 5)
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         mock_init.assert_called_once_with('app_name')
         mock_Notification.assert_has_calls([
             mock.call('Starting', 'app_name is starting up'),
@@ -147,15 +147,15 @@ class GtkNotificationDriverTest(unittest.TestCase):
             mock.call().show(),
         ])
 
-    @mock.patch('heyu.notifier.NotifierServer',
+    @mock.patch('heyu.notifications.NotificationServer',
                 return_value=mock.MagicMock(app_name='app_name',
                                             app_id='app_id'))
     @mock.patch.object(pynotify, 'init')
     @mock.patch.object(pynotify, 'Notification')
     @mock.patch.object(gtk, 'backoff', return_value=range(3))
     def test_retry(self, mock_backoff, mock_Notification, mock_init,
-                   mock_NotifierServer):
-        mock_NotifierServer.return_value.__iter__.side_effect = [
+                   mock_NotificationServer):
+        mock_NotificationServer.return_value.__iter__.side_effect = [
             iter([
                 mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
                           app_name='application-1', summary='summary-1',
@@ -173,10 +173,10 @@ class GtkNotificationDriverTest(unittest.TestCase):
             ]),
         ]
 
-        gtk.gtk_notification_driver('hub')
+        gtk.gtk_notifier('hub')
 
         mock_backoff.assert_called_once_with(300, 30, 5)
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         mock_init.assert_called_once_with('app_name')
         mock_Notification.assert_has_calls([
             mock.call('Starting', 'app_name is starting up'),

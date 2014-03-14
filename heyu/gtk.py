@@ -22,7 +22,7 @@ try:
 except ImportError:
     from heyu import fake_pynotify as pynotify
 
-from heyu import notifier
+from heyu import notifications
 from heyu import protocol
 
 
@@ -103,8 +103,8 @@ def backoff(max_sleep, threshold, recover):
                     'seconds since the last attempt is divided by this '
                     'factor and used to reduce the time before the next '
                     'connection attempt.')
-def gtk_notification_driver(hub, cert_conf=None, secure=True,
-                            max_sleep=300, threshold=30, recover=5):
+def gtk_notifier(hub, cert_conf=None, secure=True,
+                 max_sleep=300, threshold=30, recover=5):
     """
     GTK notification driver.  This uses the PyGTK package "pynotify"
     to generate desktop notifications from the notifications received
@@ -131,31 +131,31 @@ def gtk_notification_driver(hub, cert_conf=None, secure=True,
     """
 
     # Set up the server
-    server = notifier.NotifierServer(hub, cert_conf, secure)
+    server = notifications.NotificationServer(hub, cert_conf, secure)
 
     # Initialize pynotify
     pynotify.init(server.app_name)
 
     # Need a dictionary mapping notification IDs to
     # pynotify.Notification instances
-    notifications = {}
+    notifies = {}
 
     # Set up our direct notification
-    notifications[server.app_id] = pynotify.Notification(
+    notifies[server.app_id] = pynotify.Notification(
         "Starting", "%s is starting up" % server.app_name)
-    notifications[server.app_id].set_category('network')
-    notifications[server.app_id].set_urgency(protocol.URGENCY_LOW)
-    notifications[server.app_id].show()
+    notifies[server.app_id].set_category('network')
+    notifies[server.app_id].set_urgency(protocol.URGENCY_LOW)
+    notifies[server.app_id].show()
 
     # Keep connected to the HeyU hub
     for _dummy in backoff(max_sleep, threshold, recover):
         # Consume notifications
         for msg in server:
             # Get a Notification instance
-            noti = notifications.get(msg.id)
+            noti = notifies.get(msg.id)
             if noti is None:
                 noti = pynotify.Notification(msg.summary, msg.body)
-                notifications[msg.id] = noti
+                notifies[msg.id] = noti
             else:
                 noti.update(msg.summary, msg.body)
 

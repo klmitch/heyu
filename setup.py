@@ -43,10 +43,10 @@ setup(
             'heyu-notifier = heyu.notifier:notification_server.console',
         ],
         'heyu.notifier': [
-            'stdout = heyu.notifier:stdout_notification_driver',
-            'file = heyu.notifier:file_notification_driver',
-            'script = heyu.notifier:script_notification_driver',
-            'gtk = heyu.gtk:gtk_notification_driver',
+            'stdout = heyu.notifications:stdout_notifier',
+            'file = heyu.notifications:file_notifier',
+            'script = heyu.notifications:script_notifier',
+            'gtk = heyu.gtk:gtk_notifier',
         ],
     },
 )

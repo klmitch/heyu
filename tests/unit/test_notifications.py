@@ -20,7 +20,7 @@ import unittest
 
 import mock
 
-from heyu import notifier
+from heyu import notifications
 from heyu import protocol
 from heyu import util
 
@@ -29,7 +29,7 @@ class TestException(Exception):
     pass
 
 
-class NotifierServerTest(unittest.TestCase):
+class NotificationServerTest(unittest.TestCase):
     def _signal_test(self, notifier_server, mock_signal):
         signals = [
             mock.call(signal.SIGINT, notifier_server.stop),
@@ -49,7 +49,7 @@ class NotifierServerTest(unittest.TestCase):
     @mock.patch.object(util, 'outgoing_endpoint', return_value='endpoint')
     def test_init_basic(self, mock_outgoing_endpoint, mock_cert_wrapper,
                         mock_Event, mock_uuid4, mock_signal, mock_get_manager):
-        result = notifier.NotifierServer('hub')
+        result = notifications.NotificationServer('hub')
 
         self.assertEqual('hub', result._hub)
         self.assertEqual('manager', result._manager)
@@ -74,8 +74,8 @@ class NotifierServerTest(unittest.TestCase):
     @mock.patch.object(util, 'outgoing_endpoint', return_value='endpoint')
     def test_init_alt(self, mock_outgoing_endpoint, mock_cert_wrapper,
                       mock_Event, mock_uuid4, mock_signal, mock_get_manager):
-        result = notifier.NotifierServer('hub', 'cert_conf', False, 'app',
-                                         'app-uuid')
+        result = notifications.NotificationServer('hub', 'cert_conf', False,
+                                                  'app', 'app-uuid')
 
         self.assertEqual('hub', result._hub)
         self.assertEqual('manager', result._manager)
@@ -91,10 +91,11 @@ class NotifierServerTest(unittest.TestCase):
             'cert_conf', 'notifier', secure=False)
         self._signal_test(result, mock_signal)
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
-    @mock.patch.object(notifier.NotifierServer, 'start')
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifications.NotificationServer, 'start')
     def test_iter_running(self, mock_start, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = 'application'
 
         result = iter(server)
@@ -102,10 +103,11 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual(server, result)
         self.assertFalse(mock_start.called)
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
-    @mock.patch.object(notifier.NotifierServer, 'start')
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifications.NotificationServer, 'start')
     def test_iter_nonrunning(self, mock_start, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = None
 
         result = iter(server)
@@ -113,10 +115,11 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual(server, result)
         mock_start.assert_called_once_with()
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     @mock.patch.object(sys, 'exit', side_effect=TestException())
     def test_next_notification(self, mock_exit, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._notifications = ['notification']
         server._notify_event = mock.Mock()
         server._hub_app = None
@@ -126,10 +129,11 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual('notification', result)
         self.assertEqual(0, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     @mock.patch.object(sys, 'exit', side_effect=TestException())
     def test_next_exit(self, mock_exit, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._notifications = [None]
         server._notify_event = mock.Mock()
         server._hub_app = None
@@ -138,10 +142,11 @@ class NotifierServerTest(unittest.TestCase):
         mock_exit.assert_called_once_with()
         self.assertEqual(0, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     @mock.patch.object(sys, 'exit', side_effect=TestException())
     def test_next_empty_stop(self, mock_exit, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._notifications = []
         server._notify_event = mock.Mock()
         server._hub_app = None
@@ -152,10 +157,11 @@ class NotifierServerTest(unittest.TestCase):
         ])
         self.assertEqual(1, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     @mock.patch.object(sys, 'exit', side_effect=TestException())
     def test_next_empty_loop(self, mock_exit, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._notifications = []
         server._notify_event = mock.Mock()
         server._hub_app = 'app'
@@ -173,10 +179,12 @@ class NotifierServerTest(unittest.TestCase):
         ])
         self.assertEqual(2, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
-    @mock.patch.object(notifier, 'NotifierApplication', return_value='app')
-    def test_acceptor(self, mock_NotifierApplication, mock_init):
-        server = notifier.NotifierServer()
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
+    @mock.patch.object(notifications, 'NotificationApplication',
+                       return_value='app')
+    def test_acceptor(self, mock_NotificationApplication, mock_init):
+        server = notifications.NotificationServer()
         server._hub_app = True
         server._app_name = 'app_name'
         server._app_id = 'app_id'
@@ -184,12 +192,13 @@ class NotifierServerTest(unittest.TestCase):
         result = server._acceptor('tendril')
 
         self.assertEqual('app', result)
-        mock_NotifierApplication.assert_called_once_with(
+        mock_NotificationApplication.assert_called_once_with(
             'tendril', server, 'app_name', 'app_id')
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_start_running(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = 'running'
         server._manager = mock.Mock()
         server._hub = 'hub'
@@ -199,9 +208,10 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual('running', server._hub_app)
         self.assertEqual(0, len(server._manager.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_start_stopped(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = None
         server._manager = mock.Mock()
         server._hub = 'hub'
@@ -216,9 +226,10 @@ class NotifierServerTest(unittest.TestCase):
         ])
         self.assertEqual(2, len(server._manager.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_stop_stopped(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = None
         server._manager = mock.Mock()
         server._notifications = []
@@ -231,10 +242,11 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual(0, len(server._manager.method_calls))
         self.assertEqual(0, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_stop_simple(self, mock_init):
         app = mock.Mock()
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = app
         server._manager = mock.Mock()
         server._notifications = []
@@ -251,9 +263,10 @@ class NotifierServerTest(unittest.TestCase):
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_stop_connecting(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = True
         server._manager = mock.Mock()
         server._notifications = []
@@ -268,10 +281,11 @@ class NotifierServerTest(unittest.TestCase):
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_stop_sentinel(self, mock_init):
         app = mock.Mock()
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = app
         server._manager = mock.Mock()
         server._notifications = []
@@ -288,9 +302,10 @@ class NotifierServerTest(unittest.TestCase):
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_shutdown_stopped(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = None
         server._manager = mock.Mock()
         server._notifications = []
@@ -303,9 +318,10 @@ class NotifierServerTest(unittest.TestCase):
         self.assertEqual(0, len(server._manager.method_calls))
         self.assertEqual(0, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_shutdown_running(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._hub_app = 'running'
         server._manager = mock.Mock()
         server._notifications = []
@@ -320,9 +336,10 @@ class NotifierServerTest(unittest.TestCase):
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_notify(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._notifications = []
         server._notify_event = mock.Mock()
 
@@ -332,33 +349,35 @@ class NotifierServerTest(unittest.TestCase):
         server._notify_event.set.assert_called_once_with()
         self.assertEqual(1, len(server._notify_event.method_calls))
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_app_name(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._app_name = 'app_name'
 
         self.assertEqual('app_name', server.app_name)
 
-    @mock.patch.object(notifier.NotifierServer, '__init__', return_value=None)
+    @mock.patch.object(notifications.NotificationServer, '__init__',
+                       return_value=None)
     def test_app_id(self, mock_init):
-        server = notifier.NotifierServer()
+        server = notifications.NotificationServer()
         server._app_id = 'app_id'
 
         self.assertEqual('app_id', server.app_id)
 
 
-class NotifierApplicationTest(unittest.TestCase):
+class NotificationApplicationTest(unittest.TestCase):
     @mock.patch('tendril.Application.__init__', return_value=None)
     @mock.patch('tendril.COBSFramer', return_value='framer')
     @mock.patch.object(protocol, 'Message', return_value=mock.Mock(**{
         'to_frame.return_value': 'some frame',
     }))
-    @mock.patch.object(notifier.NotifierApplication, 'send_frame')
+    @mock.patch.object(notifications.NotificationApplication, 'send_frame')
     def test_init(self, mock_send_frame, mock_Message,
                   mock_COBSFramer, mock_init):
         parent = mock.Mock()
-        result = notifier.NotifierApplication(parent, 'server',
-                                              'app_name', 'app_id')
+        result = notifications.NotificationApplication(parent, 'server',
+                                                       'app_name', 'app_id')
 
         self.assertEqual('server', result.server)
         self.assertEqual('app_name', result.app_name)
@@ -372,14 +391,14 @@ class NotifierApplicationTest(unittest.TestCase):
 
     @mock.patch.object(protocol.Message, 'from_frame',
                        side_effect=ValueError('failed to decode'))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
-    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
-    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'disconnect')
+    @mock.patch.object(notifications.NotificationApplication, 'closed')
     def test_recv_frame_decodeerror(self, mock_closed, mock_disconnect,
                                     mock_notify, mock_init, mock_from_frame):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.recv_frame('test')
@@ -388,7 +407,7 @@ class NotifierApplicationTest(unittest.TestCase):
         mock_notify.assert_called_once_with(
             'Failed To Parse Server Message',
             'Unable to parse a message from the server: failed to decode',
-            notifier.ERROR)
+            notifications.ERROR)
         mock_disconnect.assert_called_once_with()
         self.assertFalse(mock_closed.called)
         app.server.stop.assert_called_once_with()
@@ -396,14 +415,14 @@ class NotifierApplicationTest(unittest.TestCase):
 
     @mock.patch.object(protocol.Message, 'from_frame', return_value=mock.Mock(
         msg_type='unknown'))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
-    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
-    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'disconnect')
+    @mock.patch.object(notifications.NotificationApplication, 'closed')
     def test_recv_frame_unknownmsg(self, mock_closed, mock_disconnect,
                                    mock_notify, mock_init, mock_from_frame):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.recv_frame('test')
@@ -412,7 +431,7 @@ class NotifierApplicationTest(unittest.TestCase):
         mock_notify.assert_called_once_with(
             'Unknown Server Message',
             'An unrecognized server message of type "unknown" was received.',
-            notifier.ERROR)
+            notifications.ERROR)
         self.assertFalse(mock_disconnect.called)
         self.assertFalse(mock_closed.called)
         self.assertFalse(app.server.stop.called)
@@ -420,14 +439,14 @@ class NotifierApplicationTest(unittest.TestCase):
 
     @mock.patch.object(protocol.Message, 'from_frame', return_value=mock.Mock(
         msg_type='error', reason='some error'))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
-    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
-    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'disconnect')
+    @mock.patch.object(notifications.NotificationApplication, 'closed')
     def test_recv_frame_error(self, mock_closed, mock_disconnect,
                               mock_notify, mock_init, mock_from_frame):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.recv_frame('test')
@@ -436,7 +455,7 @@ class NotifierApplicationTest(unittest.TestCase):
         mock_notify.assert_called_once_with(
             'Communication Error',
             'An error occurred communicating with the HeyU hub: some error',
-            notifier.ERROR)
+            notifications.ERROR)
         mock_disconnect.assert_called_once_with()
         self.assertFalse(mock_closed.called)
         app.server.stop.assert_called_once_with()
@@ -444,14 +463,14 @@ class NotifierApplicationTest(unittest.TestCase):
 
     @mock.patch.object(protocol.Message, 'from_frame', return_value=mock.Mock(
         msg_type='goodbye'))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
-    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
-    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'disconnect')
+    @mock.patch.object(notifications.NotificationApplication, 'closed')
     def test_recv_frame_goodbye(self, mock_closed, mock_disconnect,
                                 mock_notify, mock_init, mock_from_frame):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.recv_frame('test')
@@ -465,14 +484,14 @@ class NotifierApplicationTest(unittest.TestCase):
 
     @mock.patch.object(protocol.Message, 'from_frame', return_value=mock.Mock(
         msg_type='subscribed'))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
-    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
-    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'disconnect')
+    @mock.patch.object(notifications.NotificationApplication, 'closed')
     def test_recv_frame_subscribed(self, mock_closed, mock_disconnect,
                                    mock_notify, mock_init, mock_from_frame):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.recv_frame('test')
@@ -481,7 +500,7 @@ class NotifierApplicationTest(unittest.TestCase):
         mock_notify.assert_called_once_with(
             'Connection Established',
             'The connection to the HeyU hub has been established.',
-            notifier.CONNECTED)
+            notifications.CONNECTED)
         self.assertFalse(mock_disconnect.called)
         self.assertFalse(mock_closed.called)
         self.assertFalse(app.server.stop.called)
@@ -489,14 +508,14 @@ class NotifierApplicationTest(unittest.TestCase):
 
     @mock.patch.object(protocol.Message, 'from_frame', return_value=mock.Mock(
         msg_type='notify'))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
-    @mock.patch.object(notifier.NotifierApplication, 'disconnect')
-    @mock.patch.object(notifier.NotifierApplication, 'closed')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'disconnect')
+    @mock.patch.object(notifications.NotificationApplication, 'closed')
     def test_recv_frame_notify(self, mock_closed, mock_disconnect,
                                mock_notify, mock_init, mock_from_frame):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.recv_frame('test')
@@ -511,13 +530,13 @@ class NotifierApplicationTest(unittest.TestCase):
     @mock.patch.object(protocol, 'Message', return_value=mock.Mock(**{
         'to_frame.return_value': 'frame',
     }))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'send_frame')
-    @mock.patch.object(notifier.NotifierApplication, 'close')
+    @mock.patch.object(notifications.NotificationApplication, 'send_frame')
+    @mock.patch.object(notifications.NotificationApplication, 'close')
     def test_disconnect_success(self, mock_close, mock_send_frame, mock_init,
                                 mock_Message):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
 
         app.disconnect()
 
@@ -529,14 +548,14 @@ class NotifierApplicationTest(unittest.TestCase):
     @mock.patch.object(protocol, 'Message', return_value=mock.Mock(**{
         'to_frame.return_value': 'frame',
     }))
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'send_frame',
+    @mock.patch.object(notifications.NotificationApplication, 'send_frame',
                        side_effect=TestException('test'))
-    @mock.patch.object(notifier.NotifierApplication, 'close')
+    @mock.patch.object(notifications.NotificationApplication, 'close')
     def test_disconnect_failure(self, mock_close, mock_send_frame, mock_init,
                                 mock_Message):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
 
         app.disconnect()
 
@@ -545,11 +564,11 @@ class NotifierApplicationTest(unittest.TestCase):
         mock_send_frame.assert_called_once_with('frame')
         mock_close.assert_called_once_with()
 
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
-    @mock.patch.object(notifier.NotifierApplication, 'notify')
+    @mock.patch.object(notifications.NotificationApplication, 'notify')
     def test_closed(self, mock_notify, mock_init):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
 
         app.closed(None)
@@ -557,14 +576,14 @@ class NotifierApplicationTest(unittest.TestCase):
         mock_notify.assert_called_once_with(
             'Connection Closed',
             'The connection to the HeyU hub has been closed.',
-            notifier.DISCONNECTED)
+            notifications.DISCONNECTED)
         app.server.stop.assert_called_once_with()
 
     @mock.patch.object(protocol, 'Message', return_value='notification')
-    @mock.patch.object(notifier.NotifierApplication, '__init__',
+    @mock.patch.object(notifications.NotificationApplication, '__init__',
                        return_value=None)
     def test_notify(self, mock_init, mock_Message):
-        app = notifier.NotifierApplication()
+        app = notifications.NotificationApplication()
         app.server = mock.Mock()
         app.app_name = 'app_name'
         app.app_id = 'app_id'
@@ -577,9 +596,9 @@ class NotifierApplicationTest(unittest.TestCase):
         app.server.notify.assert_called_once_with('notification')
 
 
-class StdoutNotificationDriverTest(unittest.TestCase):
+class StdoutNotifierTest(unittest.TestCase):
     @mock.patch.object(sys, 'stdout', io.BytesIO())
-    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+    @mock.patch.object(notifications, 'NotificationServer', return_value=[
         mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
                   app_name='application-1', summary='summary-1', body='body-1',
                   category='cat-1'),
@@ -590,10 +609,10 @@ class StdoutNotificationDriverTest(unittest.TestCase):
                   app_name='application-3', summary='summary-3', body='body-3',
                   category='cat-3'),
     ])
-    def test_output(self, mock_NotifierServer):
-        notifier.stdout_notification_driver('hub')
+    def test_output(self, mock_NotificationServer):
+        notifications.stdout_notifier('hub')
 
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         self.assertEqual(
             'ID notify-1, urgency low\n'
             'Application: application-1\n'
@@ -627,9 +646,9 @@ class MyBytesIO(io.BytesIO):
         super(MyBytesIO, self).close()
 
 
-class FileNotificationDriverTest(unittest.TestCase):
+class FileNotifierTest(unittest.TestCase):
     @mock.patch('__builtin__.open', return_value=MyBytesIO())
-    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+    @mock.patch.object(notifications, 'NotificationServer', return_value=[
         mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
                   app_name='application-1', summary='summary-1', body='body-1',
                   category='cat-1'),
@@ -640,11 +659,11 @@ class FileNotificationDriverTest(unittest.TestCase):
                   app_name='application-3', summary='summary-3', body='body-3',
                   category='cat-3'),
     ])
-    def test_output(self, mock_NotifierServer, mock_open):
-        notifier.file_notification_driver('file', 'hub')
+    def test_output(self, mock_NotificationServer, mock_open):
+        notifications.file_notifier('file', 'hub')
 
         mock_open.assert_called_once_with('file', 'a')
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         self.assertEqual(
             'ID notify-1, urgency low\n'
             'Application: application-1\n'
@@ -668,35 +687,37 @@ class ValidateSubsTest(unittest.TestCase):
     def test_no_substitutions(self):
         exemplar = 'this is a test'
 
-        result = notifier._validate_subs(exemplar)
+        result = notifications._validate_subs(exemplar)
 
         self.assertEqual(exemplar, result)
 
     def test_known_substitutions(self):
         exemplar = '{id} {application} {summary} {body} {category} {urgency}'
 
-        result = notifier._validate_subs(exemplar)
+        result = notifications._validate_subs(exemplar)
 
         self.assertEqual(exemplar, result)
 
     def test_substitutions_passthrough(self):
         exemplar = '{id} {id!r} {id: ^23s}'
 
-        result = notifier._validate_subs(exemplar)
+        result = notifications._validate_subs(exemplar)
 
         self.assertEqual(exemplar, result)
 
     def test_bad_char(self):
-        self.assertRaises(ValueError, notifier._validate_subs, 'foo { bar')
+        self.assertRaises(ValueError, notifications._validate_subs,
+                          'foo { bar')
 
     def test_bad_field(self):
-        self.assertRaises(ValueError, notifier._validate_subs, '{unknown}')
+        self.assertRaises(ValueError, notifications._validate_subs,
+                          '{unknown}')
 
 
-class ScriptNotificationDriverTest(unittest.TestCase):
+class ScriptNotifierTest(unittest.TestCase):
     @mock.patch.object(sys, 'stderr', io.BytesIO())
     @mock.patch('subprocess.call')
-    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+    @mock.patch.object(notifications, 'NotificationServer', return_value=[
         mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
                   app_name='application-1', summary='summary-1', body='body-1',
                   category='cat-1'),
@@ -707,14 +728,14 @@ class ScriptNotificationDriverTest(unittest.TestCase):
                   app_name='application-3', summary='summary-3', body='body-3',
                   category='cat-3'),
     ])
-    def test_basic(self, mock_NotifierServer, mock_call):
-        notifier.script_notification_driver([
+    def test_basic(self, mock_NotificationServer, mock_call):
+        notifications.script_notifier([
             'command', 'id={id}', 'application={application}',
             'summary={summary}', 'body={body}', 'category={category}',
             'urgency={urgency}',
         ], 'hub')
 
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         self.assertEqual('', sys.stderr.getvalue())
         mock_call.assert_has_calls([
             mock.call([
@@ -736,7 +757,7 @@ class ScriptNotificationDriverTest(unittest.TestCase):
 
     @mock.patch.object(sys, 'stderr', io.BytesIO())
     @mock.patch('subprocess.call', side_effect=TestException('bad command'))
-    @mock.patch.object(notifier, 'NotifierServer', return_value=[
+    @mock.patch.object(notifications, 'NotificationServer', return_value=[
         mock.Mock(id='notify-1', urgency=protocol.URGENCY_LOW,
                   app_name='application-1', summary='summary-1', body='body-1',
                   category='cat-1'),
@@ -747,14 +768,14 @@ class ScriptNotificationDriverTest(unittest.TestCase):
                   app_name='application-3', summary='summary-3', body='body-3',
                   category='cat-3'),
     ])
-    def test_error(self, mock_NotifierServer, mock_call):
-        notifier.script_notification_driver([
+    def test_error(self, mock_NotificationServer, mock_call):
+        notifications.script_notifier([
             'command', 'id={id}', 'application={application}',
             'summary={summary}', 'body={body}', 'category={category}',
             'urgency={urgency}',
         ], 'hub')
 
-        mock_NotifierServer.assert_called_once_with('hub', None, True)
+        mock_NotificationServer.assert_called_once_with('hub', None, True)
         self.assertEqual('Failed to call command: bad command\n'
                          'Failed to call command: bad command\n'
                          'Failed to call command: bad command\n',
