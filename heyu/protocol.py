@@ -1,4 +1,4 @@
-# Copyright 2014 Rackspace
+# Copyright 2014, 2015 Rackspace
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -96,7 +96,7 @@ class Message(object):
             version = data['__version__']
             msg_type = data['msg_type']
         except KeyError as e:
-            raise ValueError("missing required PDU field %s" % str(e))
+            raise ValueError("missing required PDU field %s" % e)
 
         # Construct a message; we pass the frame in to prime the frame
         # cache

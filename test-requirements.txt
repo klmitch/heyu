@@ -1,1 +1,5 @@
-mock>=1.0
+coverage
+mock
+nose
+pep8
+tox

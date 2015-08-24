@@ -1,4 +1,3 @@
 cli_tools
-gevent
+framer
 msgpack_python
-tendril
