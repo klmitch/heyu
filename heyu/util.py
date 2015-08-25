@@ -20,10 +20,21 @@ import ConfigParser
 import os
 import re
 import socket
+import ssl
 import sys
 
-from gevent import ssl
-import tendril
+# Import the correct asyncio library
+try:
+    import asyncio
+except ImportError:
+    import trollius as asyncio
+
+
+# Select the correct SSLContext class to use
+if hasattr(ssl, 'SSLContext'):
+    SSLContext = ssl.SSLContext
+else:
+    SSLContext = asyncio.SSLContext
 
 
 # Default port for the HeyU hub
@@ -99,29 +110,29 @@ def default_hub():
         return ('127.0.0.1', HEYU_PORT)
 
 
-def outgoing_endpoint(target):
-    """
-    The ``tendril.get_manager()`` function must be called with the
-    appropriate originating endpoint for the target address
-    family--that is, if the hub is on an IPv4 address,
-    ``tendril.get_manager()`` must be called with an endpoint of
-    ``('', 0)``, and if it is an IPv6 address, the endpoint must be
-    ``('::', 0)``.  This helper function selects the correct
-    originating endpoint given the target address.
+# def outgoing_endpoint(target):
+#     """
+#     The ``tendril.get_manager()`` function must be called with the
+#     appropriate originating endpoint for the target address
+#     family--that is, if the hub is on an IPv4 address,
+#     ``tendril.get_manager()`` must be called with an endpoint of
+#     ``('', 0)``, and if it is an IPv6 address, the endpoint must be
+#     ``('::', 0)``.  This helper function selects the correct
+#     originating endpoint given the target address.
 
-    :param target: The target of the connection.
+#     :param target: The target of the connection.
 
-    :returns: One of ``('', 0)`` or ``('::', 0)``, depending on the
-              address family of ``target``.
-    """
+#     :returns: One of ``('', 0)`` or ``('::', 0)``, depending on the
+#               address family of ``target``.
+#     """
 
-    # Need the address family of the target
-    fam = tendril.addr_info(target)
+#     # Need the address family of the target
+#     fam = tendril.addr_info(target)
 
-    # Select the correct endpoint
-    if fam == socket.AF_INET6:
-        return ('::', 0)
-    return ('', 0)
+#     # Select the correct endpoint
+#     if fam == socket.AF_INET6:
+#         return ('::', 0)
+#     return ('', 0)
 
 
 # Regular expression for parsing a certificate configuration
@@ -139,84 +150,84 @@ class CertException(Exception):
     pass
 
 
-def cert_wrapper(cert_conf, profile, server_side=False, secure=True):
-    """
-    Compute and return a ``tendril.TendrilPartial`` object which will
-    set up TLS on the HeyU port.
+# def cert_wrapper(cert_conf, profile, server_side=False, secure=True):
+#     """
+#     Compute and return a ``tendril.TendrilPartial`` object which will
+#     set up TLS on the HeyU port.
 
-    :param cert_conf: The path to the certificate profile
-                      configuration file.  If ``None``, "~/.heyu.cert"
-                      is used.  The path is tilde-expanded.  Note that
-                      the path may included an alternate profile name,
-                      enclosed in braces ('[]') and appended to the
-                      end of the path; this will override the value of
-                      ``profile``.
-    :param profile: The name of the default profile to use.
-    :param server_side: If ``True``, TLS will be set up for the server
-                        side of the connection, rather than the client
-                        side.  Defaults to ``False``.
-    :param secure: If ``True``, TLS will be set up, and an error
-                   raised if the certificate configuration file cannot
-                   be found.  If ``False``, TLS will not be set up.
+#     :param cert_conf: The path to the certificate profile
+#                       configuration file.  If ``None``, "~/.heyu.cert"
+#                       is used.  The path is tilde-expanded.  Note that
+#                       the path may included an alternate profile name,
+#                       enclosed in braces ('[]') and appended to the
+#                       end of the path; this will override the value of
+#                       ``profile``.
+#     :param profile: The name of the default profile to use.
+#     :param server_side: If ``True``, TLS will be set up for the server
+#                         side of the connection, rather than the client
+#                         side.  Defaults to ``False``.
+#     :param secure: If ``True``, TLS will be set up, and an error
+#                    raised if the certificate configuration file cannot
+#                    be found.  If ``False``, TLS will not be set up.
 
-    :returns: A wrapper callable, suitable for use with Tendril, that
-              will set up TLS authentication and encryption for the
-              HeyU connection.
-    """
+#     :returns: A wrapper callable, suitable for use with Tendril, that
+#               will set up TLS authentication and encryption for the
+#               HeyU connection.
+#     """
 
-    # Set up no wrappers if we're set up insecure
-    if not secure:
-        return None
+#     # Set up no wrappers if we're set up insecure
+#     if not secure:
+#         return None
 
-    # We need to find the certificate configuration file...
-    if cert_conf is None:
-        cert_conf = '~/.heyu.cert'
-    else:
-        # Parse the configuration specification
-        match = CERTCONF_RE.match(cert_conf)
-        if not match:
-            raise CertException("Could not understand certificate "
-                                "configuration path '%s'" % cert_conf)
+#     # We need to find the certificate configuration file...
+#     if cert_conf is None:
+#         cert_conf = '~/.heyu.cert'
+#     else:
+#         # Parse the configuration specification
+#         match = CERTCONF_RE.match(cert_conf)
+#         if not match:
+#             raise CertException("Could not understand certificate "
+#                                 "configuration path '%s'" % cert_conf)
 
-        # Set the stripped path
-        cert_conf = match.group('conf_path')
+#         # Set the stripped path
+#         cert_conf = match.group('conf_path')
 
-        # Was the profile overridden?
-        override = match.group('profile')
-        if override:
-            profile = override
+#         # Was the profile overridden?
+#         override = match.group('profile')
+#         if override:
+#             profile = override
 
-    # Look up and read the certificate configuration
-    cert_path = os.path.expanduser(cert_conf)
-    cp = ConfigParser.SafeConfigParser()
-    if not cp.read(cert_path):
-        raise CertException("Could not read certificate configuration "
-                            "file '%s'" % cert_path)
+#     # Look up and read the certificate configuration
+#     cert_path = os.path.expanduser(cert_conf)
+#     cp = ConfigParser.SafeConfigParser()
+#     if not cp.read(cert_path):
+#         raise CertException("Could not read certificate configuration "
+#                             "file '%s'" % cert_path)
 
-    # Suck in the profile
-    try:
-        conf = dict(cp.items(profile))
-    except ConfigParser.NoSectionError:
-        raise CertException("No such profile [%s] in configuration file '%s'" %
-                            (profile, cert_path))
-    except Exception as exc:
-        raise CertException("Could not load profile [%s] from '%s': %s" %
-                            (profile, cert_path, exc))
+#     # Suck in the profile
+#     try:
+#         conf = dict(cp.items(profile))
+#     except ConfigParser.NoSectionError:
+#         raise CertException("No such profile [%s] in configuration file '%s'" %
+#                             (profile, cert_path))
+#     except Exception as exc:
+#         raise CertException("Could not load profile [%s] from '%s': %s" %
+#                             (profile, cert_path, exc))
 
-    # All we need now is the three essential configuration settings
-    missing = [key for key in ('cafile', 'certfile', 'keyfile')
-               if key not in conf]
-    if missing:
-        raise CertException("Missing configuration for the following "
-                            "values in the [%s] profile of '%s': %s" %
-                            (profile, cert_path, ', '.join(sorted(missing))))
+#     # All we need now is the three essential configuration settings
+#     missing = [key for key in ('cafile', 'certfile', 'keyfile')
+#                if key not in conf]
+#     if missing:
+#         raise CertException("Missing configuration for the following "
+#                             "values in the [%s] profile of '%s': %s" %
+#                             (profile, cert_path, ', '.join(sorted(missing))))
 
-    return tendril.TendrilPartial(
-        ssl.wrap_socket,
-        keyfile=conf['keyfile'], certfile=conf['certfile'],
-        ca_certs=conf['cafile'],
-        server_side=server_side, cert_reqs=ssl.CERT_REQUIRED,
-        ssl_version=ssl.PROTOCOL_TLSv1)
+#     return tendril.TendrilPartial(
+#         ssl.wrap_socket,
+#         keyfile=conf['keyfile'], certfile=conf['certfile'],
+#         ca_certs=conf['cafile'],
+#         server_side=server_side, cert_reqs=ssl.CERT_REQUIRED,
+#         ssl_version=ssl.PROTOCOL_TLSv1)
 
 
 def daemonize(workdir='/', pidfile=None):
